@@ -3,7 +3,7 @@ import { calculateStandings } from '@/lib/utils';
 import { Player, Week, Fixture } from '@/types';
 import LeagueTable from '@/components/LeagueTable';
 import PublicFixtures from '@/components/PublicFixtures';
-import Image from 'next/image';
+import HeroImage from '@/components/HeroImage';
 
 // Revalidate every 60 seconds for near-real-time updates
 export const revalidate = 60;
@@ -33,21 +33,7 @@ export default async function HomePage() {
         <div className="absolute inset-0 bg-gradient-to-b from-emerald-950/60 via-charcoal-950/80 to-charcoal-950 z-10" />
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-amber-900/20 via-transparent to-transparent z-10" />
         <div className="relative z-20 max-w-6xl mx-auto px-4 py-10 sm:py-16 flex flex-col sm:flex-row items-center gap-6">
-          <div className="flex-shrink-0">
-            <div className="w-20 h-20 sm:w-28 sm:h-28 rounded-full overflow-hidden border-4 border-emerald-600 shadow-2xl shadow-emerald-900/50 ring-2 ring-amber-500/30">
-              <img
-                src="/hero.jpg"
-                alt="MP Mess Darts League"
-                className="w-full h-full object-cover"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).style.display = 'none';
-                }}
-              />
-              <div className="w-full h-full bg-gradient-to-br from-emerald-800 to-charcoal-900 flex items-center justify-center">
-                <span className="text-3xl">🎯</span>
-              </div>
-            </div>
-          </div>
+          <HeroImage />
           <div>
             <p className="text-emerald-400 text-xs font-bold tracking-[0.3em] uppercase mb-1">Official League</p>
             <h1 className="text-4xl sm:text-6xl font-black text-white tracking-tight leading-none">
@@ -65,12 +51,9 @@ export default async function HomePage() {
 
       {/* Main Content */}
       <main className="max-w-6xl mx-auto px-4 py-8 space-y-10">
-        {/* Standings */}
         <section>
           <LeagueTable standings={standings} />
         </section>
-
-        {/* Fixtures & Results */}
         <section>
           <PublicFixtures weeks={weeks} fixtures={fixtures} players={players} />
         </section>
