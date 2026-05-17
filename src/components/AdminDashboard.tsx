@@ -24,18 +24,19 @@ export default function AdminDashboard({ initialPlayers, initialWeeks, initialFi
   const [p1Id, setP1Id] = useState('');
   const [p2Id, setP2Id] = useState('');
 
-  // Score update state
   const [editingFixtureId, setEditingFixtureId] = useState<string | null>(null);
   const [scoreP1, setScoreP1] = useState('');
   const [scoreP2, setScoreP2] = useState('');
 
-  React.useEffect(() => { setPlayers(initialPlayers); }, [initialPlayers]);
-  React.useEffect(() => { setWeeks(initialWeeks); }, [initialWeeks]);
-  React.useEffect(() => { setFixtures(initialFixtures); }, [initialFixtures]);
+  // Edit fixture players
+  const [editingPlayersId, setEditingPlayersId] = useState<string | null>(null);
+  const [editP1Id, setEditP1Id] = useState('');
+  const [editP2Id, setEditP2Id] = useState('');
+  const [editWeekId, setEditWeekId] = useState('');
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
-    router.push('/login');
+    window.location.replace('/login');
   };
 
   const addPlayer = async (e: React.FormEvent) => {
@@ -46,12 +47,8 @@ export default function AdminDashboard({ initialPlayers, initialWeeks, initialFi
       .insert([{ name: newPlayerName.trim() }])
       .select()
       .single();
-    if (error) {
-      alert(error.message);
-    } else {
-      setPlayers((prev) => [...prev, data]);
-      setNewPlayerName('');
-    }
+    if (error) { alert(error.message); } 
+    else { setPlayers((prev) => [...prev, data]); setNewPlayerName(''); }
   };
 
   const addWeek = async (e: React.FormEvent) => {
@@ -63,18 +60,14 @@ export default function AdminDashboard({ initialPlayers, initialWeeks, initialFi
       .insert([{ name: newWeekName.trim(), sequence_order: order }])
       .select()
       .single();
-    if (error) {
-      alert(error.message);
-    } else {
-      setWeeks((prev) => [...prev, data]);
-      setNewWeekName('');
-    }
+    if (error) { alert(error.message); } 
+    else { setWeeks((prev) => [...prev, data]); setNewWeekName(''); }
   };
 
   const createFixture = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedWeek || !p1Id || !p2Id || p1Id === p2Id) {
-      alert('Select distinct competing entities.');
+      alert('Select a week and two different players.');
       return;
     }
     const { data, error } = await supabase
@@ -82,13 +75,8 @@ export default function AdminDashboard({ initialPlayers, initialWeeks, initialFi
       .insert([{ week_id: selectedWeek, player_1_id: p1Id, player_2_id: p2Id, completed: false }])
       .select()
       .single();
-    if (error) {
-      alert(error.message);
-    } else {
-      setFixtures((prev) => [...prev, data]);
-      setP1Id('');
-      setP2Id('');
-    }
+    if (error) { alert(error.message); } 
+    else { setFixtures((prev) => [...prev, data]); setP1Id(''); setP2Id(''); }
   };
 
   const submitScore = async (fixtureId: string) => {
@@ -102,19 +90,46 @@ export default function AdminDashboard({ initialPlayers, initialWeeks, initialFi
       .from('fixtures')
       .update({ player_1_score: s1, player_2_score: s2, completed: true })
       .eq('id', fixtureId);
-    if (error) {
-      alert(error.message);
-    } else {
-      setFixtures((prev) =>
-        prev.map((f) =>
-          f.id === fixtureId
-            ? { ...f, player_1_score: s1, player_2_score: s2, completed: true }
-            : f
-        )
-      );
+    if (error) { alert(error.message); } 
+    else {
+      setFixtures((prev) => prev.map((f) =>
+        f.id === fixtureId ? { ...f, player_1_score: s1, player_2_score: s2, completed: true } : f
+      ));
       setEditingFixtureId(null);
       setScoreP1('');
       setScoreP2('');
+    }
+  };
+
+  const deleteFixture = async (fixtureId: string) => {
+    if (!confirm('Delete this fixture? This cannot be undone.')) return;
+    const { error } = await supabase.from('fixtures').delete().eq('id', fixtureId);
+    if (error) { alert(error.message); } 
+    else { setFixtures((prev) => prev.filter((f) => f.id !== fixtureId)); }
+  };
+
+  const openEditPlayers = (f: Fixture) => {
+    setEditingPlayersId(f.id);
+    setEditP1Id(f.player_1_id);
+    setEditP2Id(f.player_2_id);
+    setEditWeekId(f.week_id);
+  };
+
+  const saveEditPlayers = async (fixtureId: string) => {
+    if (!editP1Id || !editP2Id || editP1Id === editP2Id) {
+      alert('Select two different players.');
+      return;
+    }
+    const { error } = await supabase
+      .from('fixtures')
+      .update({ player_1_id: editP1Id, player_2_id: editP2Id, week_id: editWeekId })
+      .eq('id', fixtureId);
+    if (error) { alert(error.message); } 
+    else {
+      setFixtures((prev) => prev.map((f) =>
+        f.id === fixtureId ? { ...f, player_1_id: editP1Id, player_2_id: editP2Id, week_id: editWeekId } : f
+      ));
+      setEditingPlayersId(null);
     }
   };
 
@@ -129,56 +144,35 @@ export default function AdminDashboard({ initialPlayers, initialWeeks, initialFi
           <h1 className="text-2xl font-black tracking-tight text-white">League HQ Dashboard</h1>
           <p className="text-xs text-emerald-400 font-medium">Secured Administrative Terminal</p>
         </div>
-        <button
-          onClick={handleSignOut}
-          className="px-4 py-2 bg-charcoal-950 hover:bg-charcoal-800 text-gray-300 text-xs font-bold rounded-lg transition-all"
-        >
-          Disconnect Auth
+        <button onClick={handleSignOut} className="px-4 py-2 bg-charcoal-950 hover:bg-charcoal-800 text-gray-300 text-xs font-bold rounded-lg transition-all">
+          Sign Out
         </button>
       </div>
 
       {/* Player & Week Management */}
       <div className="grid gap-6 md:grid-cols-2">
-        {/* Add Player */}
         <div className="bg-charcoal-900 border border-emerald-950 p-5 rounded-xl space-y-4">
-          <h2 className="text-lg font-bold text-white border-b border-charcoal-800 pb-2">Player Roster Operations</h2>
+          <h2 className="text-lg font-bold text-white border-b border-charcoal-800 pb-2">Player Roster</h2>
           <form onSubmit={addPlayer} className="flex gap-2">
-            <input
-              type="text"
-              placeholder="Player Name"
-              value={newPlayerName}
-              onChange={(e) => setNewPlayerName(e.target.value)}
-              className="flex-1 bg-charcoal-950 border border-emerald-900/60 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-emerald-500"
-            />
-            <button type="submit" className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm px-4 py-2 rounded-lg transition-colors">
-              Add Player
-            </button>
+            <input type="text" placeholder="Player Name" value={newPlayerName} onChange={(e) => setNewPlayerName(e.target.value)}
+              className="flex-1 bg-charcoal-950 border border-emerald-900/60 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-emerald-500" />
+            <button type="submit" className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm px-4 py-2 rounded-lg transition-colors">Add</button>
           </form>
           {players.length > 0 && (
             <ul className="space-y-1 max-h-48 overflow-y-auto">
               {players.map((p) => (
-                <li key={p.id} className="text-sm text-gray-300 px-3 py-1.5 bg-charcoal-950 rounded-lg">
-                  {p.name}
-                </li>
+                <li key={p.id} className="text-sm text-gray-300 px-3 py-1.5 bg-charcoal-950 rounded-lg">{p.name}</li>
               ))}
             </ul>
           )}
         </div>
 
-        {/* Add Week */}
         <div className="bg-charcoal-900 border border-emerald-950 p-5 rounded-xl space-y-4">
-          <h2 className="text-lg font-bold text-white border-b border-charcoal-800 pb-2">League Stages &amp; Weeks</h2>
+          <h2 className="text-lg font-bold text-white border-b border-charcoal-800 pb-2">Weeks / Stages</h2>
           <form onSubmit={addWeek} className="flex gap-2">
-            <input
-              type="text"
-              placeholder="e.g., Week 1"
-              value={newWeekName}
-              onChange={(e) => setNewWeekName(e.target.value)}
-              className="flex-1 bg-charcoal-950 border border-emerald-900/60 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-emerald-500"
-            />
-            <button type="submit" className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm px-4 py-2 rounded-lg transition-colors">
-              Add Stage
-            </button>
+            <input type="text" placeholder="e.g., Week 1" value={newWeekName} onChange={(e) => setNewWeekName(e.target.value)}
+              className="flex-1 bg-charcoal-950 border border-emerald-900/60 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-emerald-500" />
+            <button type="submit" className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm px-4 py-2 rounded-lg transition-colors">Add</button>
           </form>
           {weeks.length > 0 && (
             <ul className="space-y-1 max-h-48 overflow-y-auto">
@@ -197,121 +191,116 @@ export default function AdminDashboard({ initialPlayers, initialWeeks, initialFi
       <div className="bg-charcoal-900 border border-emerald-950 p-5 rounded-xl space-y-4">
         <h2 className="text-lg font-bold text-white border-b border-charcoal-800 pb-2">Schedule New Fixture</h2>
         <form onSubmit={createFixture} className="grid gap-3 sm:grid-cols-4">
-          <select
-            value={selectedWeek}
-            onChange={(e) => setSelectedWeek(e.target.value)}
-            className="bg-charcoal-950 border border-emerald-900/60 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
-          >
+          <select value={selectedWeek} onChange={(e) => setSelectedWeek(e.target.value)}
+            className="bg-charcoal-950 border border-emerald-900/60 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500">
             <option value="">Select Week</option>
-            {sortedWeeks.map((w) => (
-              <option key={w.id} value={w.id}>{w.name}</option>
-            ))}
+            {sortedWeeks.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
           </select>
-          <select
-            value={p1Id}
-            onChange={(e) => setP1Id(e.target.value)}
-            className="bg-charcoal-950 border border-emerald-900/60 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
-          >
+          <select value={p1Id} onChange={(e) => setP1Id(e.target.value)}
+            className="bg-charcoal-950 border border-emerald-900/60 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500">
             <option value="">Player 1</option>
-            {players.map((p) => (
-              <option key={p.id} value={p.id}>{p.name}</option>
-            ))}
+            {players.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
-          <select
-            value={p2Id}
-            onChange={(e) => setP2Id(e.target.value)}
-            className="bg-charcoal-950 border border-emerald-900/60 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
-          >
+          <select value={p2Id} onChange={(e) => setP2Id(e.target.value)}
+            className="bg-charcoal-950 border border-emerald-900/60 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500">
             <option value="">Player 2</option>
-            {players.map((p) => (
-              <option key={p.id} value={p.id}>{p.name}</option>
-            ))}
+            {players.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
-          <button type="submit" className="bg-amber-600 hover:bg-amber-500 text-white font-bold text-sm px-4 py-2 rounded-lg transition-colors">
-            Create Fixture
-          </button>
+          <button type="submit" className="bg-amber-600 hover:bg-amber-500 text-white font-bold text-sm px-4 py-2 rounded-lg transition-colors">Create</button>
         </form>
       </div>
 
-      {/* Score Entry */}
+      {/* Fixtures Management */}
       <div className="bg-charcoal-900 border border-emerald-950 p-5 rounded-xl space-y-4">
-        <h2 className="text-lg font-bold text-white border-b border-charcoal-800 pb-2">Score Entry Terminal</h2>
+        <h2 className="text-lg font-bold text-white border-b border-charcoal-800 pb-2">Fixtures Management</h2>
         {fixtures.length === 0 ? (
           <p className="text-gray-500 text-sm">No fixtures created yet.</p>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-4">
             {sortedWeeks.map((w) => {
               const wFixtures = fixtures.filter((f) => f.week_id === w.id);
               if (wFixtures.length === 0) return null;
               return (
                 <div key={w.id}>
                   <p className="text-xs font-bold text-emerald-500 uppercase tracking-widest mb-2">{w.name}</p>
-                  <div className="grid gap-2 sm:grid-cols-2">
+                  <div className="grid gap-3 sm:grid-cols-2">
                     {wFixtures.map((f) => {
                       const p1 = playerMap.get(f.player_1_id);
                       const p2 = playerMap.get(f.player_2_id);
-                      const isEditing = editingFixtureId === f.id;
+                      const isEditingScore = editingFixtureId === f.id;
+                      const isEditingPlayers = editingPlayersId === f.id;
+
                       return (
                         <div key={f.id} className="bg-charcoal-950 border border-emerald-900/30 rounded-lg p-3 space-y-2">
-                          <div className="flex items-center justify-between text-sm">
-                            <span className={`font-bold truncate max-w-[100px] ${f.completed && f.player_1_score > f.player_2_score ? 'text-amber-400' : 'text-gray-200'}`}>
-                              {p1?.name || '?'}
-                            </span>
-                            <span className="font-mono font-black text-white px-2">
-                              {f.completed ? `${f.player_1_score}-${f.player_2_score}` : 'VS'}
-                            </span>
-                            <span className={`font-bold truncate max-w-[100px] text-right ${f.completed && f.player_2_score > f.player_1_score ? 'text-amber-400' : 'text-gray-200'}`}>
-                              {p2?.name || '?'}
-                            </span>
-                          </div>
-
-                          {isEditing ? (
-                            <div className="flex gap-2 items-center">
-                              <input
-                                type="number"
-                                min="0"
-                                value={scoreP1}
-                                onChange={(e) => setScoreP1(e.target.value)}
-                                placeholder="P1"
-                                className="w-14 bg-charcoal-900 border border-emerald-700 rounded px-2 py-1 text-sm text-white text-center focus:outline-none"
-                              />
-                              <span className="text-gray-500 text-xs">-</span>
-                              <input
-                                type="number"
-                                min="0"
-                                value={scoreP2}
-                                onChange={(e) => setScoreP2(e.target.value)}
-                                placeholder="P2"
-                                className="w-14 bg-charcoal-900 border border-emerald-700 rounded px-2 py-1 text-sm text-white text-center focus:outline-none"
-                              />
-                              <button
-                                onClick={() => submitScore(f.id)}
-                                className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold py-1 rounded transition-colors"
-                              >
-                                Save
-                              </button>
-                              <button
-                                onClick={() => { setEditingFixtureId(null); setScoreP1(''); setScoreP2(''); }}
-                                className="text-gray-500 hover:text-gray-300 text-xs px-1"
-                              >
-                                ✕
-                              </button>
+                          {/* Players row */}
+                          {isEditingPlayers ? (
+                            <div className="space-y-2">
+                              <select value={editWeekId} onChange={(e) => setEditWeekId(e.target.value)}
+                                className="w-full bg-charcoal-900 border border-emerald-700 rounded px-2 py-1 text-xs text-white focus:outline-none">
+                                {sortedWeeks.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
+                              </select>
+                              <div className="flex gap-2">
+                                <select value={editP1Id} onChange={(e) => setEditP1Id(e.target.value)}
+                                  className="flex-1 bg-charcoal-900 border border-emerald-700 rounded px-2 py-1 text-xs text-white focus:outline-none">
+                                  {players.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                                </select>
+                                <span className="text-gray-500 text-xs self-center">vs</span>
+                                <select value={editP2Id} onChange={(e) => setEditP2Id(e.target.value)}
+                                  className="flex-1 bg-charcoal-900 border border-emerald-700 rounded px-2 py-1 text-xs text-white focus:outline-none">
+                                  {players.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                                </select>
+                              </div>
+                              <div className="flex gap-2">
+                                <button onClick={() => saveEditPlayers(f.id)}
+                                  className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold py-1.5 rounded transition-colors">Save</button>
+                                <button onClick={() => setEditingPlayersId(null)}
+                                  className="text-gray-500 hover:text-gray-300 text-xs px-2">Cancel</button>
+                              </div>
                             </div>
                           ) : (
-                            <button
-                              onClick={() => {
-                                setEditingFixtureId(f.id);
-                                setScoreP1(f.completed ? String(f.player_1_score) : '');
-                                setScoreP2(f.completed ? String(f.player_2_score) : '');
-                              }}
-                              className={`w-full text-xs font-bold py-1.5 rounded transition-colors ${
-                                f.completed
-                                  ? 'bg-charcoal-800 text-gray-400 hover:bg-charcoal-700'
-                                  : 'bg-emerald-900/40 text-emerald-400 hover:bg-emerald-900/60'
-                              }`}
-                            >
-                              {f.completed ? 'Edit Score' : 'Enter Score'}
-                            </button>
+                            <div className="flex items-center justify-between text-sm">
+                              <span className={`font-bold truncate max-w-[90px] ${f.completed && f.player_1_score > f.player_2_score ? 'text-amber-400' : 'text-gray-200'}`}>
+                                {p1?.name || '?'}
+                              </span>
+                              <span className="font-mono font-black text-white px-2">
+                                {f.completed ? `${f.player_1_score}-${f.player_2_score}` : 'VS'}
+                              </span>
+                              <span className={`font-bold truncate max-w-[90px] text-right ${f.completed && f.player_2_score > f.player_1_score ? 'text-amber-400' : 'text-gray-200'}`}>
+                                {p2?.name || '?'}
+                              </span>
+                            </div>
+                          )}
+
+                          {/* Score entry */}
+                          {!isEditingPlayers && (
+                            isEditingScore ? (
+                              <div className="flex gap-2 items-center">
+                                <input type="number" min="0" value={scoreP1} onChange={(e) => setScoreP1(e.target.value)} placeholder="P1"
+                                  className="w-14 bg-charcoal-900 border border-emerald-700 rounded px-2 py-1 text-sm text-white text-center focus:outline-none" />
+                                <span className="text-gray-500 text-xs">-</span>
+                                <input type="number" min="0" value={scoreP2} onChange={(e) => setScoreP2(e.target.value)} placeholder="P2"
+                                  className="w-14 bg-charcoal-900 border border-emerald-700 rounded px-2 py-1 text-sm text-white text-center focus:outline-none" />
+                                <button onClick={() => submitScore(f.id)}
+                                  className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold py-1 rounded transition-colors">Save</button>
+                                <button onClick={() => { setEditingFixtureId(null); setScoreP1(''); setScoreP2(''); }}
+                                  className="text-gray-500 hover:text-gray-300 text-xs px-1">✕</button>
+                              </div>
+                            ) : (
+                              <div className="grid grid-cols-3 gap-1">
+                                <button onClick={() => { setEditingFixtureId(f.id); setScoreP1(f.completed ? String(f.player_1_score) : ''); setScoreP2(f.completed ? String(f.player_2_score) : ''); }}
+                                  className={`text-xs font-bold py-1.5 rounded transition-colors ${f.completed ? 'bg-charcoal-800 text-gray-400 hover:bg-charcoal-700' : 'bg-emerald-900/40 text-emerald-400 hover:bg-emerald-900/60'}`}>
+                                  {f.completed ? 'Edit Score' : 'Enter Score'}
+                                </button>
+                                <button onClick={() => openEditPlayers(f)}
+                                  className="text-xs font-bold py-1.5 rounded transition-colors bg-amber-900/40 text-amber-400 hover:bg-amber-900/60">
+                                  Edit Fixture
+                                </button>
+                                <button onClick={() => deleteFixture(f.id)}
+                                  className="text-xs font-bold py-1.5 rounded transition-colors bg-rose-900/40 text-rose-400 hover:bg-rose-900/60">
+                                  Delete
+                                </button>
+                              </div>
+                            )
                           )}
                         </div>
                       );
