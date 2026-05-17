@@ -3,7 +3,6 @@
 import React, { useState } from 'react';
 import { Player, Week, Fixture } from '@/types';
 import { supabase } from '@/lib/supabase';
-import { useRouter } from 'next/navigation';
 
 interface AdminDashboardProps {
   initialPlayers: Player[];
@@ -12,7 +11,6 @@ interface AdminDashboardProps {
 }
 
 export default function AdminDashboard({ initialPlayers, initialWeeks, initialFixtures }: AdminDashboardProps) {
-  const router = useRouter();
   const [players, setPlayers] = useState<Player[]>(initialPlayers);
   const [weeks, setWeeks] = useState<Week[]>(initialWeeks);
   const [fixtures, setFixtures] = useState<Fixture[]>(initialFixtures);
@@ -28,7 +26,6 @@ export default function AdminDashboard({ initialPlayers, initialWeeks, initialFi
   const [scoreP1, setScoreP1] = useState('');
   const [scoreP2, setScoreP2] = useState('');
 
-  // Edit fixture players
   const [editingPlayersId, setEditingPlayersId] = useState<string | null>(null);
   const [editP1Id, setEditP1Id] = useState('');
   const [editP2Id, setEditP2Id] = useState('');
@@ -47,8 +44,18 @@ export default function AdminDashboard({ initialPlayers, initialWeeks, initialFi
       .insert([{ name: newPlayerName.trim() }])
       .select()
       .single();
-    if (error) { alert(error.message); } 
+    if (error) { alert(error.message); }
     else { setPlayers((prev) => [...prev, data]); setNewPlayerName(''); }
+  };
+
+  const deletePlayer = async (playerId: string, playerName: string) => {
+    if (!confirm(`Delete ${playerName}? This will also delete all their fixtures.`)) return;
+    const { error } = await supabase.from('players').delete().eq('id', playerId);
+    if (error) { alert(error.message); }
+    else {
+      setPlayers((prev) => prev.filter((p) => p.id !== playerId));
+      setFixtures((prev) => prev.filter((f) => f.player_1_id !== playerId && f.player_2_id !== playerId));
+    }
   };
 
   const addWeek = async (e: React.FormEvent) => {
@@ -60,7 +67,7 @@ export default function AdminDashboard({ initialPlayers, initialWeeks, initialFi
       .insert([{ name: newWeekName.trim(), sequence_order: order }])
       .select()
       .single();
-    if (error) { alert(error.message); } 
+    if (error) { alert(error.message); }
     else { setWeeks((prev) => [...prev, data]); setNewWeekName(''); }
   };
 
@@ -75,7 +82,7 @@ export default function AdminDashboard({ initialPlayers, initialWeeks, initialFi
       .insert([{ week_id: selectedWeek, player_1_id: p1Id, player_2_id: p2Id, completed: false }])
       .select()
       .single();
-    if (error) { alert(error.message); } 
+    if (error) { alert(error.message); }
     else { setFixtures((prev) => [...prev, data]); setP1Id(''); setP2Id(''); }
   };
 
@@ -90,7 +97,7 @@ export default function AdminDashboard({ initialPlayers, initialWeeks, initialFi
       .from('fixtures')
       .update({ player_1_score: s1, player_2_score: s2, completed: true })
       .eq('id', fixtureId);
-    if (error) { alert(error.message); } 
+    if (error) { alert(error.message); }
     else {
       setFixtures((prev) => prev.map((f) =>
         f.id === fixtureId ? { ...f, player_1_score: s1, player_2_score: s2, completed: true } : f
@@ -104,7 +111,7 @@ export default function AdminDashboard({ initialPlayers, initialWeeks, initialFi
   const deleteFixture = async (fixtureId: string) => {
     if (!confirm('Delete this fixture? This cannot be undone.')) return;
     const { error } = await supabase.from('fixtures').delete().eq('id', fixtureId);
-    if (error) { alert(error.message); } 
+    if (error) { alert(error.message); }
     else { setFixtures((prev) => prev.filter((f) => f.id !== fixtureId)); }
   };
 
@@ -124,7 +131,7 @@ export default function AdminDashboard({ initialPlayers, initialWeeks, initialFi
       .from('fixtures')
       .update({ player_1_id: editP1Id, player_2_id: editP2Id, week_id: editWeekId })
       .eq('id', fixtureId);
-    if (error) { alert(error.message); } 
+    if (error) { alert(error.message); }
     else {
       setFixtures((prev) => prev.map((f) =>
         f.id === fixtureId ? { ...f, player_1_id: editP1Id, player_2_id: editP2Id, week_id: editWeekId } : f
@@ -151,6 +158,7 @@ export default function AdminDashboard({ initialPlayers, initialWeeks, initialFi
 
       {/* Player & Week Management */}
       <div className="grid gap-6 md:grid-cols-2">
+        {/* Players */}
         <div className="bg-charcoal-900 border border-emerald-950 p-5 rounded-xl space-y-4">
           <h2 className="text-lg font-bold text-white border-b border-charcoal-800 pb-2">Player Roster</h2>
           <form onSubmit={addPlayer} className="flex gap-2">
@@ -161,12 +169,19 @@ export default function AdminDashboard({ initialPlayers, initialWeeks, initialFi
           {players.length > 0 && (
             <ul className="space-y-1 max-h-48 overflow-y-auto">
               {players.map((p) => (
-                <li key={p.id} className="text-sm text-gray-300 px-3 py-1.5 bg-charcoal-950 rounded-lg">{p.name}</li>
+                <li key={p.id} className="flex items-center justify-between text-sm text-gray-300 px-3 py-1.5 bg-charcoal-950 rounded-lg">
+                  <span>{p.name}</span>
+                  <button onClick={() => deletePlayer(p.id, p.name)}
+                    className="text-rose-500 hover:text-rose-400 text-xs font-bold ml-2 transition-colors">
+                    Delete
+                  </button>
+                </li>
               ))}
             </ul>
           )}
         </div>
 
+        {/* Weeks */}
         <div className="bg-charcoal-900 border border-emerald-950 p-5 rounded-xl space-y-4">
           <h2 className="text-lg font-bold text-white border-b border-charcoal-800 pb-2">Weeks / Stages</h2>
           <form onSubmit={addWeek} className="flex gap-2">
@@ -232,7 +247,6 @@ export default function AdminDashboard({ initialPlayers, initialWeeks, initialFi
 
                       return (
                         <div key={f.id} className="bg-charcoal-950 border border-emerald-900/30 rounded-lg p-3 space-y-2">
-                          {/* Players row */}
                           {isEditingPlayers ? (
                             <div className="space-y-2">
                               <select value={editWeekId} onChange={(e) => setEditWeekId(e.target.value)}
@@ -271,7 +285,6 @@ export default function AdminDashboard({ initialPlayers, initialWeeks, initialFi
                             </div>
                           )}
 
-                          {/* Score entry */}
                           {!isEditingPlayers && (
                             isEditingScore ? (
                               <div className="flex gap-2 items-center">
