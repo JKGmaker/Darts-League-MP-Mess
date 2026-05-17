@@ -29,10 +29,8 @@ export default async function HomePage() {
         <div className="absolute inset-0 bg-cover bg-center bg-no-repeat" style={{ backgroundImage: "url('/hero.jpg')" }} />
         <div className="absolute inset-0 bg-gradient-to-t from-charcoal-950 via-charcoal-950/60 to-transparent" />
         <div className="relative z-10 w-full max-w-6xl mx-auto px-6 pb-12 pt-32">
-          <p className="text-emerald-400 text-xs font-bold tracking-[0.3em] uppercase mb-2">Official League</p>
           <h1 className="text-5xl sm:text-7xl font-black text-white tracking-tight leading-none drop-shadow-lg">MP Mess</h1>
           <h2 className="text-4xl sm:text-6xl font-black text-amber-400 tracking-tight leading-none drop-shadow-lg">Darts League</h2>
-          <p className="text-gray-300 text-base mt-4 font-medium">Live standings · Fixtures · Results</p>
         </div>
       </header>
       <main className="max-w-6xl mx-auto px-4 py-8 space-y-10">
