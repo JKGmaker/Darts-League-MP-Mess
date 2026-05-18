@@ -34,3 +34,39 @@ export interface StandingsRow {
   legDifference: number;
   points: number;
 }
+
+export interface Leg {
+  id: string;
+  fixture_id: string;
+  leg_number: number;
+  winner_id: string | null;
+  started_at: string;
+  completed_at: string | null;
+}
+
+export interface Visit {
+  id: string;
+  leg_id: string;
+  player_id: string;
+  score: number;
+  darts_used: number;
+  is_checkout: boolean;
+  remaining_before: number;
+  created_at: string;
+}
+
+export interface PlayerStat {
+  player_id: string;
+  player_name: string;
+  games_played: number;
+  legs_won: number;
+  legs_played: number;
+  total_score: number;
+  total_darts: number;
+  three_dart_average: number;
+  checkout_attempts: number;
+  checkouts_hit: number;
+  checkout_percentage: number;
+  highest_checkout: number;
+  highest_visit: number;
+}
