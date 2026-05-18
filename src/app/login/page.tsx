@@ -1,9 +1,13 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 
-export default function LoginPage() {
+function LoginForm() {
+  const searchParams = useSearchParams();
+  const redirect = searchParams.get('redirect') || '/admin';
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -23,20 +27,26 @@ export default function LoginPage() {
     }
 
     if (data.session) {
-      window.location.replace('/admin');
+      window.location.replace(redirect);
     } else {
       setError('Login failed — no session returned. Please try again.');
       setLoading(false);
     }
   };
 
+  const isScorer = redirect.startsWith('/dart-counter');
+
   return (
     <div className="min-h-screen bg-charcoal-950 flex items-center justify-center px-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-10">
-          <span className="text-5xl block mb-4">🎯</span>
-          <h1 className="text-3xl font-black text-white tracking-tight">League HQ</h1>
-          <p className="text-emerald-400 text-sm font-medium mt-1 tracking-wider">ADMIN TERMINAL</p>
+          <span className="text-5xl block mb-4">{isScorer ? '🎯' : '🎯'}</span>
+          <h1 className="text-3xl font-black text-white tracking-tight">
+            {isScorer ? 'Scorer Login' : 'League HQ'}
+          </h1>
+          <p className="text-emerald-400 text-sm font-medium mt-1 tracking-wider">
+            {isScorer ? 'MATCH SCORER ACCESS' : 'ADMIN TERMINAL'}
+          </p>
         </div>
 
         <div className="bg-charcoal-900 border border-emerald-900/50 rounded-2xl p-8 shadow-2xl shadow-emerald-950/20">
@@ -51,7 +61,7 @@ export default function LoginPage() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="admin@example.com"
+                placeholder="scorer@mpmess.com"
                 className="w-full bg-charcoal-950 border border-emerald-900/60 rounded-lg px-4 py-3 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/30 transition-all"
               />
             </div>
@@ -82,7 +92,7 @@ export default function LoginPage() {
               disabled={loading}
               className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-900 disabled:text-emerald-700 text-white font-black text-sm py-3 rounded-lg transition-all tracking-wide"
             >
-              {loading ? 'Authenticating...' : 'Access League HQ'}
+              {loading ? 'Authenticating...' : isScorer ? 'Start Scoring' : 'Access League HQ'}
             </button>
           </form>
         </div>
@@ -92,5 +102,17 @@ export default function LoginPage() {
         </p>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-charcoal-950 flex items-center justify-center">
+        <p className="text-emerald-400 text-sm animate-pulse">Loading...</p>
+      </div>
+    }>
+      <LoginForm />
+    </Suspense>
   );
 }
