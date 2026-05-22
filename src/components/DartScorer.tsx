@@ -44,7 +44,7 @@ export default function DartScorer({ players, onClose }: DartScorerProps) {
 
   const p1LegsWon = legResults.filter(l => l.winnerId === p1Id).length;
   const p2LegsWon = legResults.filter(l => l.winnerId === p2Id).length;
-  const legsToWin = Math.ceil(totalLegs / 2);
+  const legsPlayed = legResults.length;
 
   // --- Setup handlers ---
   const canStart = p1Id && p2Id && p1Id !== p2Id;
@@ -107,7 +107,7 @@ export default function DartScorer({ players, onClose }: DartScorerProps) {
       const newP1Legs = newLegResults.filter(l => l.winnerId === p1Id).length;
       const newP2Legs = newLegResults.filter(l => l.winnerId === p2Id).length;
 
-      if (newP1Legs >= legsToWin || newP2Legs >= legsToWin) {
+      if (newLegResults.length >= totalLegs) {
         setPhase('match_complete');
       } else {
         setPhase('leg_complete');
@@ -123,7 +123,7 @@ export default function DartScorer({ players, onClose }: DartScorerProps) {
     setScores(newScores);
     setCurrentTurnIdx(nextTurnIdx);
     clearInput();
-  }, [inputValue, activeScore, scores, currentTurnIdx, p1Id, p2Id, legResults, currentLegNum, currentStarterIdx, legsToWin]);
+  }, [inputValue, activeScore, scores, currentTurnIdx, p1Id, p2Id, legResults, currentLegNum, currentStarterIdx, totalLegs]);
 
   // --- Start next leg ---
   const startNextLeg = () => {
@@ -236,7 +236,7 @@ export default function DartScorer({ players, onClose }: DartScorerProps) {
           {/* Number of legs */}
           <div className="space-y-2">
             <label className="text-xs font-bold text-gray-400 uppercase tracking-widest">
-              Best of <span className="text-white">{totalLegs}</span> Legs
+              Play <span className="text-white">{totalLegs}</span> Leg{totalLegs !== 1 ? "s" : ""}
             </label>
             <div className="grid grid-cols-5 gap-1.5">
               {[1,2,3,4,5,6,7,8,9,10].map(n => (
@@ -254,7 +254,7 @@ export default function DartScorer({ players, onClose }: DartScorerProps) {
               ))}
             </div>
             <p className="text-xs text-gray-600 text-center">
-              First to {legsToWin} leg{legsToWin !== 1 ? 's' : ''} wins
+              Most legs wins
             </p>
           </div>
         </div>
@@ -343,7 +343,7 @@ export default function DartScorer({ players, onClose }: DartScorerProps) {
                 <p className="text-4xl font-black text-white mt-1">{p2LegsWon}</p>
               </div>
             </div>
-            <p className="text-center text-xs text-gray-600 mt-3">First to {legsToWin} wins the match</p>
+            <p className="text-center text-xs text-gray-600 mt-3">{totalLegs - (p1LegsWon + p2LegsWon)} leg{totalLegs - (p1LegsWon + p2LegsWon) !== 1 ? 's' : ''} remaining</p>
           </div>
 
           <div className="space-y-2">
@@ -366,15 +366,15 @@ export default function DartScorer({ players, onClose }: DartScorerProps) {
   // PHASE: MATCH COMPLETE
   // ============================================================
   if (phase === 'match_complete') {
-    const matchWinnerIdx = p1LegsWon >= legsToWin ? 0 : 1;
-    const matchWinner = matchWinnerIdx === 0 ? player1! : player2!;
+    const matchWinnerIdx = p1LegsWon > p2LegsWon ? 0 : p2LegsWon > p1LegsWon ? 1 : -1;
+    const matchWinner = matchWinnerIdx >= 0 ? (matchWinnerIdx === 0 ? player1! : player2!) : null;
     return (
       <div className="fixed inset-0 z-50 bg-charcoal-950 flex flex-col items-center justify-center px-6 text-center">
         <div className="space-y-8 w-full max-w-sm">
           <div>
-            <div className="text-6xl mb-4">🏆</div>
-            <p className="text-gray-400 text-sm uppercase tracking-widest mb-1">Match Winner</p>
-            <h2 className="text-4xl font-black text-amber-400">{matchWinner.name}</h2>
+            <div className="text-6xl mb-4">{matchWinner ? '🏆' : '🤝'}</div>
+            <p className="text-gray-400 text-sm uppercase tracking-widest mb-1">{matchWinner ? 'Match Winner' : 'It's a Draw!'}</p>
+            {matchWinner && <h2 className="text-4xl font-black text-amber-400">{matchWinner.name}</h2>}
             <p className="text-white text-2xl font-black mt-3">
               {p1LegsWon} – {p2LegsWon}
             </p>
