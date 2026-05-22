@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { Week, Fixture, Player } from '@/types';
 
 interface PublicFixturesProps {
@@ -11,7 +10,6 @@ interface PublicFixturesProps {
 }
 
 export default function PublicFixtures({ weeks, fixtures, players }: PublicFixturesProps) {
-  const router = useRouter();
   const sortedWeeks = [...weeks].sort((a, b) => a.sequence_order - b.sequence_order);
   const [activeWeekId, setActiveWeekId] = useState<string | null>(
     sortedWeeks.length > 0 ? sortedWeeks[0].id : null
@@ -104,26 +102,19 @@ export default function PublicFixtures({ weeks, fixtures, players }: PublicFixtu
                   </div>
                 </div>
 
-                {/* Action buttons row */}
-                <div className="flex gap-2 pt-1 border-t border-emerald-950/40">
-                  {!f.completed && (
-                    <button
-                      onClick={() => router.push(`/dart-counter/${f.id}`)}
-                      className="flex-1 flex items-center justify-center gap-1.5 bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-bold py-2 px-3 rounded-lg transition-all duration-150"
-                    >
-                      <span>🎯</span>
-                      <span>Start Counter</span>
-                    </button>
+                {/* Status row */}
+                <div className="pt-1 border-t border-emerald-950/40">
+                  {f.completed ? (
+                    <div className="flex items-center justify-center gap-1.5 text-xs text-gray-500 py-1">
+                      <span>✓</span>
+                      <span>Match complete</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-center gap-1.5 text-xs text-emerald-500 py-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse inline-block" />
+                      <span>Scheduled</span>
+                    </div>
                   )}
-                  <button
-                    onClick={() => router.push(`/stats?fixture=${f.id}`)}
-                    className={`flex items-center justify-center gap-1.5 bg-charcoal-800 hover:bg-charcoal-700 text-gray-300 hover:text-white text-xs font-bold py-2 px-3 rounded-lg border border-emerald-950/40 transition-all duration-150 ${
-                      f.completed ? 'flex-1' : ''
-                    }`}
-                  >
-                    <span>📊</span>
-                    <span>Stats</span>
-                  </button>
                 </div>
               </div>
             );
