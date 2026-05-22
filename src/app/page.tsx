@@ -3,6 +3,7 @@ import { calculateStandings } from '@/lib/utils';
 import { Player, Week, Fixture } from '@/types';
 import LeagueTable from '@/components/LeagueTable';
 import PublicFixtures from '@/components/PublicFixtures';
+import ScoreButton from '@/components/ScoreButton';
 
 export const revalidate = 60;
 
@@ -34,6 +35,8 @@ export default async function HomePage() {
         </div>
       </header>
       <main className="max-w-6xl mx-auto px-4 py-8 space-y-10">
+        {/* Score a Game button */}
+        <ScoreButton players={players} />
         <section><LeagueTable standings={standings} /></section>
         <section><PublicFixtures weeks={weeks} fixtures={fixtures} players={players} /></section>
       </main>
