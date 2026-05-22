@@ -373,7 +373,7 @@ export default function DartScorer({ players, onClose }: DartScorerProps) {
         <div className="space-y-8 w-full max-w-sm">
           <div>
             <div className="text-6xl mb-4">{matchWinner ? '🏆' : '🤝'}</div>
-            <p className="text-gray-400 text-sm uppercase tracking-widest mb-1">{matchWinner ? 'Match Winner' : 'It's a Draw!'}</p>
+            <p className="text-gray-400 text-sm uppercase tracking-widest mb-1">{matchWinner ? 'Match Winner' : "It's a Draw!"}</p>
             {matchWinner && <h2 className="text-4xl font-black text-amber-400">{matchWinner.name}</h2>}
             <p className="text-white text-2xl font-black mt-3">
               {p1LegsWon} – {p2LegsWon}
