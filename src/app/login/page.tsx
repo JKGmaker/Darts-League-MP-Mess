@@ -34,7 +34,7 @@ function LoginForm() {
     }
   };
 
-  const isScorer = redirect.startsWith('/dart-counter');
+  const isScorer = false;
 
   return (
     <div className="min-h-screen bg-charcoal-950 flex items-center justify-center px-4">
