@@ -3,7 +3,7 @@ import { Fixture, Player, StandingsRow } from '@/types';
 /**
  * Calculates league standings from players and completed fixtures.
  * Scoring: Win = 2 Pts, Loss = 0 Pts.
- * Sort Hierarchy: Points → Head-to-Head → Leg Difference (+/-).
+ * Sort Hierarchy: Points → Leg Difference (+/-) → Head-to-Head → Alphabetical.
  */
 export function calculateStandings(players: Player[], fixtures: Fixture[]): StandingsRow[] {
   const stats: Record<string, Omit<StandingsRow, 'position' | 'name'>> = {};
@@ -69,11 +69,16 @@ export function calculateStandings(players: Player[], fixtures: Fixture[]): Stan
   }));
 
   standings.sort((a, b) => {
+    // 1. Points
     if (b.points !== a.points) return b.points - a.points;
+    // 2. Leg difference (+/-)
+    if (b.legDifference !== a.legDifference) return b.legDifference - a.legDifference;
+    // 3. Head-to-head (who beat whom directly)
     const aVsB = headToHead[a.playerId]?.[b.playerId] || 0;
     const bVsA = headToHead[b.playerId]?.[a.playerId] || 0;
     if (aVsB !== bVsA) return bVsA - aVsB;
-    return b.legDifference - a.legDifference;
+    // 4. Alphabetical (final fallback)
+    return a.name.localeCompare(b.name);
   });
 
   return standings.map((row, idx) => ({ ...row, position: idx + 1 }));
