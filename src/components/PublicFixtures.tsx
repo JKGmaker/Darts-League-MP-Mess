@@ -108,11 +108,13 @@ export default function PublicFixtures({ weeks, fixtures, players }: PublicFixtu
                     <div className="flex items-center justify-center gap-1.5 text-xs text-gray-500 py-1">
                       <span>✓</span>
                       <span>Match complete</span>
+                      {f.best_of ? <span className="text-gray-600">· Best of {f.best_of}</span> : null}
                     </div>
                   ) : (
                     <div className="flex items-center justify-center gap-1.5 text-xs text-emerald-500 py-1">
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse inline-block" />
                       <span>Scheduled</span>
+                      {f.best_of ? <span className="text-gray-600">· Best of {f.best_of}</span> : null}
                     </div>
                   )}
                 </div>

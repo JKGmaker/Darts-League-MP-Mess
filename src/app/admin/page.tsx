@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import AdminDashboard from '@/components/AdminDashboard';
+import PlayoffsAdmin from '@/components/PlayoffsAdmin';
 import { Player, Week, Fixture } from '@/types';
 
 export default function AdminPage() {
@@ -57,6 +58,13 @@ export default function AdminPage() {
           initialWeeks={weeks}
           initialFixtures={fixtures}
         />
+        <div className="mt-10 pt-8 border-t border-emerald-900/30">
+          <PlayoffsAdmin
+            initialPlayers={players}
+            initialWeeks={weeks}
+            initialFixtures={fixtures}
+          />
+        </div>
       </div>
     </div>
   );

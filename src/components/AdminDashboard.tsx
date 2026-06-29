@@ -25,6 +25,7 @@ export default function AdminDashboard({ initialPlayers, initialWeeks, initialFi
   const [editingFixtureId, setEditingFixtureId] = useState<string | null>(null);
   const [scoreP1, setScoreP1] = useState('');
   const [scoreP2, setScoreP2] = useState('');
+  const [bestOf, setBestOf] = useState('5');
 
   const [editingPlayersId, setEditingPlayersId] = useState<string | null>(null);
   const [editP1Id, setEditP1Id] = useState('');
@@ -93,18 +94,21 @@ export default function AdminDashboard({ initialPlayers, initialWeeks, initialFi
       alert('Enter valid non-negative scores.');
       return;
     }
+    const bo = parseInt(bestOf, 10);
+    const safeBo = isNaN(bo) || bo < 1 ? 5 : bo;
     const { error } = await supabase
       .from('fixtures')
-      .update({ player_1_score: s1, player_2_score: s2, completed: true })
+      .update({ player_1_score: s1, player_2_score: s2, completed: true, best_of: safeBo })
       .eq('id', fixtureId);
     if (error) { alert(error.message); }
     else {
       setFixtures((prev) => prev.map((f) =>
-        f.id === fixtureId ? { ...f, player_1_score: s1, player_2_score: s2, completed: true } : f
+        f.id === fixtureId ? { ...f, player_1_score: s1, player_2_score: s2, completed: true, best_of: safeBo } : f
       ));
       setEditingFixtureId(null);
       setScoreP1('');
       setScoreP2('');
+      setBestOf('5');
     }
   };
 
@@ -287,31 +291,41 @@ export default function AdminDashboard({ initialPlayers, initialWeeks, initialFi
 
                           {!isEditingPlayers && (
                             isEditingScore ? (
-                              <div className="flex gap-2 items-center">
-                                <input type="number" min="0" value={scoreP1} onChange={(e) => setScoreP1(e.target.value)} placeholder="P1"
-                                  className="w-14 bg-charcoal-900 border border-emerald-700 rounded px-2 py-1 text-sm text-white text-center focus:outline-none" />
-                                <span className="text-gray-500 text-xs">-</span>
-                                <input type="number" min="0" value={scoreP2} onChange={(e) => setScoreP2(e.target.value)} placeholder="P2"
-                                  className="w-14 bg-charcoal-900 border border-emerald-700 rounded px-2 py-1 text-sm text-white text-center focus:outline-none" />
-                                <button onClick={() => submitScore(f.id)}
-                                  className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold py-1 rounded transition-colors">Save</button>
-                                <button onClick={() => { setEditingFixtureId(null); setScoreP1(''); setScoreP2(''); }}
-                                  className="text-gray-500 hover:text-gray-300 text-xs px-1">✕</button>
+                              <div className="space-y-2">
+                                <div className="flex gap-2 items-center">
+                                  <input type="number" min="0" value={scoreP1} onChange={(e) => setScoreP1(e.target.value)} placeholder="P1"
+                                    className="w-14 bg-charcoal-900 border border-emerald-700 rounded px-2 py-1 text-sm text-white text-center focus:outline-none" />
+                                  <span className="text-gray-500 text-xs">-</span>
+                                  <input type="number" min="0" value={scoreP2} onChange={(e) => setScoreP2(e.target.value)} placeholder="P2"
+                                    className="w-14 bg-charcoal-900 border border-emerald-700 rounded px-2 py-1 text-sm text-white text-center focus:outline-none" />
+                                  <label className="text-[10px] text-gray-500 ml-1">Best of</label>
+                                  <input type="number" min="1" value={bestOf} onChange={(e) => setBestOf(e.target.value)} placeholder="5"
+                                    className="w-12 bg-charcoal-900 border border-amber-700/60 rounded px-2 py-1 text-sm text-white text-center focus:outline-none" />
+                                </div>
+                                <div className="flex gap-2">
+                                  <button onClick={() => submitScore(f.id)}
+                                    className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold py-1.5 rounded transition-colors">Save</button>
+                                  <button onClick={() => { setEditingFixtureId(null); setScoreP1(''); setScoreP2(''); setBestOf('5'); }}
+                                    className="text-gray-500 hover:text-gray-300 text-xs px-2">Cancel</button>
+                                </div>
                               </div>
                             ) : (
-                              <div className="grid grid-cols-3 gap-1">
-                                <button onClick={() => { setEditingFixtureId(f.id); setScoreP1(f.completed ? String(f.player_1_score) : ''); setScoreP2(f.completed ? String(f.player_2_score) : ''); }}
-                                  className={`text-xs font-bold py-1.5 rounded transition-colors ${f.completed ? 'bg-charcoal-800 text-gray-400 hover:bg-charcoal-700' : 'bg-emerald-900/40 text-emerald-400 hover:bg-emerald-900/60'}`}>
-                                  {f.completed ? 'Edit Score' : 'Enter Score'}
-                                </button>
-                                <button onClick={() => openEditPlayers(f)}
-                                  className="text-xs font-bold py-1.5 rounded transition-colors bg-amber-900/40 text-amber-400 hover:bg-amber-900/60">
-                                  Edit Fixture
-                                </button>
-                                <button onClick={() => deleteFixture(f.id)}
-                                  className="text-xs font-bold py-1.5 rounded transition-colors bg-rose-900/40 text-rose-400 hover:bg-rose-900/60">
-                                  Delete
-                                </button>
+                              <div className="space-y-1.5">
+                                <p className="text-[10px] text-gray-500 text-center">Best of {f.best_of ?? 5}</p>
+                                <div className="grid grid-cols-3 gap-1">
+                                  <button onClick={() => { setEditingFixtureId(f.id); setScoreP1(f.completed ? String(f.player_1_score) : ''); setScoreP2(f.completed ? String(f.player_2_score) : ''); setBestOf(String(f.best_of ?? 5)); }}
+                                    className={`text-xs font-bold py-1.5 rounded transition-colors ${f.completed ? 'bg-charcoal-800 text-gray-400 hover:bg-charcoal-700' : 'bg-emerald-900/40 text-emerald-400 hover:bg-emerald-900/60'}`}>
+                                    {f.completed ? 'Edit Score' : 'Enter Score'}
+                                  </button>
+                                  <button onClick={() => openEditPlayers(f)}
+                                    className="text-xs font-bold py-1.5 rounded transition-colors bg-amber-900/40 text-amber-400 hover:bg-amber-900/60">
+                                    Edit Fixture
+                                  </button>
+                                  <button onClick={() => deleteFixture(f.id)}
+                                    className="text-xs font-bold py-1.5 rounded transition-colors bg-rose-900/40 text-rose-400 hover:bg-rose-900/60">
+                                    Delete
+                                  </button>
+                                </div>
                               </div>
                             )
                           )}

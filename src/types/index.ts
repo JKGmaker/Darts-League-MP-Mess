@@ -18,8 +18,31 @@ export interface Fixture {
   player_1_score: number;
   player_2_score: number;
   completed: boolean;
+  best_of?: number;
   players_player_1?: Player;
   players_player_2?: Player;
+}
+
+export type Bracket = 'championship' | 'shield';
+
+export interface PlayoffSettings {
+  id: number;
+  playoffs_locked: boolean;
+  seed_snapshot: string[] | null;
+  default_best_of: number;
+}
+
+export interface PlayoffMatchRow {
+  id: string;
+  bracket: Bracket;
+  code: string;
+  best_of: number;
+  player_1_score: number;
+  player_2_score: number;
+  completed: boolean;
+  override_player_1_id: string | null;
+  override_player_2_id: string | null;
+  override_winner_id: string | null;
 }
 
 export interface StandingsRow {
