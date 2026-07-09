@@ -26,6 +26,7 @@ export default function AdminDashboard({ initialPlayers, initialWeeks, initialFi
   const [scoreP1, setScoreP1] = useState('');
   const [scoreP2, setScoreP2] = useState('');
   const [bestOf, setBestOf] = useState('5');
+  const [isWalkover, setIsWalkover] = useState(false);
 
   const [editingPlayersId, setEditingPlayersId] = useState<string | null>(null);
   const [editP1Id, setEditP1Id] = useState('');
@@ -98,17 +99,18 @@ export default function AdminDashboard({ initialPlayers, initialWeeks, initialFi
     const safeBo = isNaN(bo) || bo < 1 ? 5 : bo;
     const { error } = await supabase
       .from('fixtures')
-      .update({ player_1_score: s1, player_2_score: s2, completed: true, best_of: safeBo })
+      .update({ player_1_score: s1, player_2_score: s2, completed: true, best_of: safeBo, is_walkover: isWalkover })
       .eq('id', fixtureId);
     if (error) { alert(error.message); }
     else {
       setFixtures((prev) => prev.map((f) =>
-        f.id === fixtureId ? { ...f, player_1_score: s1, player_2_score: s2, completed: true, best_of: safeBo } : f
+        f.id === fixtureId ? { ...f, player_1_score: s1, player_2_score: s2, completed: true, best_of: safeBo, is_walkover: isWalkover } : f
       ));
       setEditingFixtureId(null);
       setScoreP1('');
       setScoreP2('');
       setBestOf('5');
+      setIsWalkover(false);
     }
   };
 
@@ -302,18 +304,26 @@ export default function AdminDashboard({ initialPlayers, initialWeeks, initialFi
                                   <input type="number" min="1" value={bestOf} onChange={(e) => setBestOf(e.target.value)} placeholder="5"
                                     className="w-12 bg-charcoal-900 border border-amber-700/60 rounded px-2 py-1 text-sm text-white text-center focus:outline-none" />
                                 </div>
+                                <label className="flex items-center gap-1.5 text-[11px] text-gray-400 select-none cursor-pointer">
+                                  <input type="checkbox" checked={isWalkover} onChange={(e) => setIsWalkover(e.target.checked)}
+                                    className="accent-amber-600" />
+                                  Walkover (affects tiebreaker only, not visible publicly)
+                                </label>
                                 <div className="flex gap-2">
                                   <button onClick={() => submitScore(f.id)}
                                     className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold py-1.5 rounded transition-colors">Save</button>
-                                  <button onClick={() => { setEditingFixtureId(null); setScoreP1(''); setScoreP2(''); setBestOf('5'); }}
+                                  <button onClick={() => { setEditingFixtureId(null); setScoreP1(''); setScoreP2(''); setBestOf('5'); setIsWalkover(false); }}
                                     className="text-gray-500 hover:text-gray-300 text-xs px-2">Cancel</button>
                                 </div>
                               </div>
                             ) : (
                               <div className="space-y-1.5">
-                                <p className="text-[10px] text-gray-500 text-center">Best of {f.best_of ?? 5}</p>
+                                <p className="text-[10px] text-gray-500 text-center">
+                                  Best of {f.best_of ?? 5}
+                                  {f.is_walkover && <span className="ml-1.5 text-amber-500 font-bold">· WO</span>}
+                                </p>
                                 <div className="grid grid-cols-3 gap-1">
-                                  <button onClick={() => { setEditingFixtureId(f.id); setScoreP1(f.completed ? String(f.player_1_score) : ''); setScoreP2(f.completed ? String(f.player_2_score) : ''); setBestOf(String(f.best_of ?? 5)); }}
+                                  <button onClick={() => { setEditingFixtureId(f.id); setScoreP1(f.completed ? String(f.player_1_score) : ''); setScoreP2(f.completed ? String(f.player_2_score) : ''); setBestOf(String(f.best_of ?? 5)); setIsWalkover(!!f.is_walkover); }}
                                     className={`text-xs font-bold py-1.5 rounded transition-colors ${f.completed ? 'bg-charcoal-800 text-gray-400 hover:bg-charcoal-700' : 'bg-emerald-900/40 text-emerald-400 hover:bg-emerald-900/60'}`}>
                                     {f.completed ? 'Edit Score' : 'Enter Score'}
                                   </button>

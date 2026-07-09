@@ -19,6 +19,7 @@ export interface Fixture {
   player_2_score: number;
   completed: boolean;
   best_of?: number;
+  is_walkover?: boolean;
   players_player_1?: Player;
   players_player_2?: Player;
 }

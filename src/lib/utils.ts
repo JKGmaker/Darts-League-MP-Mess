@@ -3,10 +3,13 @@ import { Fixture, Player, StandingsRow } from '@/types';
 /**
  * Calculates league standings from players and completed fixtures.
  * Scoring: Win = 2 Pts, Loss = 0 Pts.
- * Sort Hierarchy: Points → Leg Difference (+/-) → Head-to-Head → Alphabetical.
+ * Sort Hierarchy: Points → Leg Difference (+/-) → Head-to-Head → Walkover Points → Alphabetical.
+ * "Walkover Points" = points a player earned from fixtures marked as walkovers.
+ * A player who reaches a tie without relying on walkover wins ranks higher.
  */
 export function calculateStandings(players: Player[], fixtures: Fixture[]): StandingsRow[] {
   const stats: Record<string, Omit<StandingsRow, 'position' | 'name'>> = {};
+  const walkoverPoints: Record<string, number> = {};
 
   players.forEach((p) => {
     stats[p.id] = {
@@ -19,6 +22,7 @@ export function calculateStandings(players: Player[], fixtures: Fixture[]): Stan
       legDifference: 0,
       points: 0,
     };
+    walkoverPoints[p.id] = 0;
   });
 
   const headToHead: Record<string, Record<string, number>> = {};
@@ -50,11 +54,13 @@ export function calculateStandings(players: Player[], fixtures: Fixture[]): Stan
       stats[p1].points += 2;
       stats[p2].lost += 1;
       headToHead[p1][p2] += 1;
+      if (f.is_walkover) walkoverPoints[p1] += 2;
     } else {
       stats[p2].won += 1;
       stats[p2].points += 2;
       stats[p1].lost += 1;
       headToHead[p2][p1] += 1;
+      if (f.is_walkover) walkoverPoints[p2] += 2;
     }
   });
 
@@ -77,7 +83,11 @@ export function calculateStandings(players: Player[], fixtures: Fixture[]): Stan
     const aVsB = headToHead[a.playerId]?.[b.playerId] || 0;
     const bVsA = headToHead[b.playerId]?.[a.playerId] || 0;
     if (aVsB !== bVsA) return bVsA - aVsB;
-    // 4. Alphabetical (final fallback)
+    // 4. Walkover points (fewer walkover-derived points ranks higher)
+    const aWo = walkoverPoints[a.playerId] || 0;
+    const bWo = walkoverPoints[b.playerId] || 0;
+    if (aWo !== bWo) return aWo - bWo;
+    // 5. Alphabetical (final fallback)
     return a.name.localeCompare(b.name);
   });
 
