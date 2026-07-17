@@ -65,7 +65,7 @@ export default async function PoolTournamentPage({ params }: { params: { id: str
             <PoolFixturesView rounds={rounds} fixtures={fixtures} players={players} />
           </>
         ) : (
-          <PoolBracketView rounds={rounds} fixtures={fixtures} players={players} />
+          <PoolBracketView rounds={rounds} fixtures={fixtures} players={players} tournamentStatus={tournament.status} />
         )}
       </main>
     </div>

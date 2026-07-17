@@ -1,16 +1,17 @@
 'use client';
 
 import React from 'react';
-import { PoolRound, PoolFixture, PoolPlayer } from '@/types';
+import { PoolRound, PoolFixture, PoolPlayer, PoolTournamentStatus } from '@/types';
 import { fixtureWinnerId } from '@/lib/poolUtils';
 
 interface PoolBracketViewProps {
   rounds: PoolRound[];
   fixtures: PoolFixture[];
   players: PoolPlayer[];
+  tournamentStatus: PoolTournamentStatus;
 }
 
-export default function PoolBracketView({ rounds, fixtures, players }: PoolBracketViewProps) {
+export default function PoolBracketView({ rounds, fixtures, players, tournamentStatus }: PoolBracketViewProps) {
   const sortedRounds = [...rounds].sort((a, b) => a.sequence_order - b.sequence_order);
   const playerMap = React.useMemo(() => new Map(players.map((p) => [p.id, p])), [players]);
 
@@ -18,7 +19,11 @@ export default function PoolBracketView({ rounds, fixtures, players }: PoolBrack
   const finalFixture = finalRound
     ? fixtures.find((f) => f.round_id === finalRound.id && !f.is_bye)
     : undefined;
-  const championId = finalFixture ? fixtureWinnerId(finalFixture) : null;
+  // Only treat this as the actual final once the tournament has been marked
+  // completed (i.e. an admin generated a next round and got down to 1
+  // winner) — a round simply being the most recent one doesn't mean it's
+  // the final.
+  const championId = tournamentStatus === 'completed' && finalFixture ? fixtureWinnerId(finalFixture) : null;
   const champion = championId ? playerMap.get(championId) : null;
 
   if (sortedRounds.length === 0) {
@@ -29,12 +34,22 @@ export default function PoolBracketView({ rounds, fixtures, players }: PoolBrack
     );
   }
 
+  const allCurrentRoundDone = finalRound
+    ? fixtures.filter((f) => f.round_id === finalRound.id).every((f) => f.completed)
+    : false;
+
   return (
     <div className="w-full space-y-4">
       {champion && (
         <div className="rounded-2xl border border-sky-500/40 bg-sky-500/10 p-5 text-center">
           <p className="text-xs font-bold uppercase tracking-widest text-sky-400">Champion</p>
           <p className="mt-1 text-2xl font-black text-white">🎉 {champion.name}</p>
+        </div>
+      )}
+
+      {!champion && tournamentStatus === 'active' && allCurrentRoundDone && (
+        <div className="rounded-xl border border-sky-800/40 bg-sky-950/30 p-3 text-center">
+          <p className="text-xs text-sky-400 font-semibold">Round complete — next round pending</p>
         </div>
       )}
 
