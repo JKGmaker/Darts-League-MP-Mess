@@ -169,9 +169,14 @@ export default function PoolAdminDashboard({ initialPlayers, initialTournaments 
         nextSequence += 1;
         if (pairs.length === 0) continue;
 
-        const rows = pairs.map(([p1, p2]) => ({ round_id: roundData.id, player_1_id: p1, player_2_id: p2, completed: false }));
+        const rows = pairs.map(([p1, p2]) => ({ round_id: roundData.id, player_1_id: p1, player_2_id: p2, player_1_score: 0, player_2_score: 0, completed: false }));
         const { data: fixtureData, error: fixtureError } = await supabase.from('pool_fixtures').insert(rows).select();
-        if (fixtureError) { alert(fixtureError.message); break; }
+        if (fixtureError) {
+          alert(fixtureError.message);
+          await supabase.from('pool_rounds').delete().eq('id', roundData.id);
+          newRounds.pop();
+          break;
+        }
         if (fixtureData) newFixtures.push(...fixtureData);
       }
 
@@ -198,11 +203,15 @@ export default function PoolAdminDashboard({ initialPlayers, initialTournaments 
         .single();
       if (roundError || !roundData) { alert(roundError?.message || 'Failed to create round.'); return; }
 
-      const rows: Partial<PoolFixture>[] = pairs.map(([p1, p2]) => ({ round_id: roundData.id, player_1_id: p1, player_2_id: p2, completed: false, is_bye: false }));
+      const rows: Partial<PoolFixture>[] = pairs.map(([p1, p2]) => ({ round_id: roundData.id, player_1_id: p1, player_2_id: p2, player_1_score: 0, player_2_score: 0, completed: false, is_bye: false }));
       if (byePlayerId) rows.push({ round_id: roundData.id, player_1_id: byePlayerId, player_2_id: null, completed: true, is_bye: true, player_1_score: 1, player_2_score: 0 });
 
       const { data: fixtureData, error: fixtureError } = await supabase.from('pool_fixtures').insert(rows).select();
-      if (fixtureError) { alert(fixtureError.message); return; }
+      if (fixtureError) {
+        alert(fixtureError.message);
+        await supabase.from('pool_rounds').delete().eq('id', roundData.id);
+        return;
+      }
 
       setRounds((prev) => [...prev, roundData]);
       setFixtures((prev) => [...prev, ...((fixtureData as PoolFixture[]) || [])]);
@@ -214,6 +223,10 @@ export default function PoolAdminDashboard({ initialPlayers, initialTournaments 
 
   const generateNextKnockoutRound = async () => {
     if (!selectedTournamentId || !latestRound) return;
+    if (latestRoundFixtures.length === 0) {
+      alert('This round has no fixtures in it (likely a leftover from a failed generation) — delete it below using "Delete Round", then try generating again.');
+      return;
+    }
     if (latestRoundFixtures.some((f) => !f.completed)) {
       alert('Enter results for every match in the current round first.');
       return;
@@ -236,17 +249,30 @@ export default function PoolAdminDashboard({ initialPlayers, initialTournaments 
         .single();
       if (roundError || !roundData) { alert(roundError?.message || 'Failed to create round.'); return; }
 
-      const rows: Partial<PoolFixture>[] = pairs.map(([p1, p2]) => ({ round_id: roundData.id, player_1_id: p1, player_2_id: p2, completed: false, is_bye: false }));
+      const rows: Partial<PoolFixture>[] = pairs.map(([p1, p2]) => ({ round_id: roundData.id, player_1_id: p1, player_2_id: p2, player_1_score: 0, player_2_score: 0, completed: false, is_bye: false }));
       if (byePlayerId) rows.push({ round_id: roundData.id, player_1_id: byePlayerId, player_2_id: null, completed: true, is_bye: true, player_1_score: 1, player_2_score: 0 });
 
       const { data: fixtureData, error: fixtureError } = await supabase.from('pool_fixtures').insert(rows).select();
-      if (fixtureError) { alert(fixtureError.message); return; }
+      if (fixtureError) {
+        alert(fixtureError.message);
+        await supabase.from('pool_rounds').delete().eq('id', roundData.id);
+        return;
+      }
 
       setRounds((prev) => [...prev, roundData]);
       setFixtures((prev) => [...prev, ...((fixtureData as PoolFixture[]) || [])]);
     } finally {
       setIsGenerating(false);
     }
+  };
+
+  const deleteRound = async (roundId: string, roundName: string) => {
+    if (!confirm(`Delete round "${roundName}" and all its fixtures? Use this to clean up a broken/empty round.`)) return;
+    const { error } = await supabase.from('pool_rounds').delete().eq('id', roundId);
+    if (error) { alert(error.message); return; }
+    setRounds((prev) => prev.filter((r) => r.id !== roundId));
+    setFixtures((prev) => prev.filter((f) => f.round_id !== roundId));
+    if (selectedTournament?.status === 'completed') await markTournamentStatus('active');
   };
 
   const submitScore = async (fixtureId: string) => {
@@ -414,10 +440,23 @@ export default function PoolAdminDashboard({ initialPlayers, initialTournaments 
                   <p className="text-xs font-bold text-sky-400 uppercase tracking-widest">Fixtures</p>
                   {sortedRounds.map((r) => {
                     const rFixtures = fixtures.filter((f) => f.round_id === r.id);
-                    if (rFixtures.length === 0) return null;
+                    if (rFixtures.length === 0) {
+                      return (
+                        <div key={r.id} className="border border-rose-900/40 bg-rose-950/10 rounded-lg p-3">
+                          <div className="flex items-center justify-between">
+                            <p className="text-xs font-bold text-rose-400 uppercase tracking-widest">{r.name} — empty / broken round</p>
+                            <button onClick={() => deleteRound(r.id, r.name)} className="text-[10px] font-bold text-rose-500 hover:text-rose-400">Delete Round</button>
+                          </div>
+                          <p className="text-xs text-gray-500 mt-1">No fixtures were generated for this round — likely a leftover from a failed generation. Delete it, then use &quot;Generate Next Round&quot; again.</p>
+                        </div>
+                      );
+                    }
                     return (
                       <div key={r.id}>
-                        <p className="text-xs font-bold text-sky-500 uppercase tracking-widest mb-2">{r.name}</p>
+                        <div className="flex items-center justify-between mb-2">
+                          <p className="text-xs font-bold text-sky-500 uppercase tracking-widest">{r.name}</p>
+                          <button onClick={() => deleteRound(r.id, r.name)} className="text-[10px] font-bold text-rose-500 hover:text-rose-400">Delete Round</button>
+                        </div>
                         <div className="grid gap-3 sm:grid-cols-2">
                           {rFixtures.map((f) => {
                             const p1 = playerMap.get(f.player_1_id);
