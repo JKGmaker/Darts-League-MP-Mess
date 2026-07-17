@@ -40,7 +40,7 @@ export default async function PlayoffPage({ params }: { params: { bracket: strin
       <header className={`relative overflow-hidden border-b ${isChampionship ? 'border-amber-700/30' : 'border-emerald-700/30'}`}>
         <div className={`absolute inset-0 ${isChampionship ? 'bg-gradient-to-br from-amber-900/30 via-charcoal-950 to-charcoal-950' : 'bg-gradient-to-br from-emerald-900/30 via-charcoal-950 to-charcoal-950'}`} />
         <div className="relative z-10 max-w-6xl mx-auto px-6 py-10">
-          <Link href="/" className="text-xs font-semibold text-gray-400 hover:text-white transition-colors">
+          <Link href="/darts" className="text-xs font-semibold text-gray-400 hover:text-white transition-colors">
             ← Back to League
           </Link>
           <div className="mt-4 flex items-end gap-3">
@@ -75,7 +75,7 @@ export default async function PlayoffPage({ params }: { params: { bracket: strin
             View {isChampionship ? 'Shield' : 'Championship'} →
           </Link>
           <Link
-            href="/"
+            href="/darts"
             className="px-5 py-2.5 rounded-lg text-sm font-bold bg-charcoal-900 border border-emerald-900/40 text-gray-200 hover:bg-charcoal-800 transition-colors"
           >
             League Table

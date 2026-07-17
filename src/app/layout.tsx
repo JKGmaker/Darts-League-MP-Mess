@@ -2,8 +2,8 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'MP Mess Darts League',
-  description: 'Official league table, fixtures, and results for the MP Mess Darts League.',
+  title: 'MP Mess',
+  description: 'MP Mess Darts and MP Mess Pool — league tables, fixtures, and results.',
   icons: {
     icon: '/favicon.ico',
   },

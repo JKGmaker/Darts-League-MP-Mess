@@ -42,7 +42,7 @@ function LoginForm() {
         <div className="text-center mb-10">
           <span className="text-5xl block mb-4">{isScorer ? '🎯' : '🎯'}</span>
           <h1 className="text-3xl font-black text-white tracking-tight">
-            {isScorer ? 'Scorer Login' : 'League HQ'}
+            {isScorer ? 'Scorer Login' : 'MP Mess Admin HQ'}
           </h1>
           <p className="text-emerald-400 text-sm font-medium mt-1 tracking-wider">
             {isScorer ? 'MATCH SCORER ACCESS' : 'ADMIN TERMINAL'}
@@ -92,13 +92,13 @@ function LoginForm() {
               disabled={loading}
               className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-900 disabled:text-emerald-700 text-white font-black text-sm py-3 rounded-lg transition-all tracking-wide"
             >
-              {loading ? 'Authenticating...' : isScorer ? 'Start Scoring' : 'Access League HQ'}
+              {loading ? 'Authenticating...' : isScorer ? 'Start Scoring' : 'Access Admin HQ'}
             </button>
           </form>
         </div>
 
         <p className="text-center text-gray-600 text-xs mt-6">
-          <a href="/" className="hover:text-gray-400 transition-colors">← Back to public league</a>
+          <a href="/" className="hover:text-gray-400 transition-colors">← Back to MP Mess Home</a>
         </p>
       </div>
     </div>

@@ -79,6 +79,59 @@ export interface Visit {
   created_at: string;
 }
 
+// ---------------------------------------------------------------------------
+// Pool (separate module, own tables — see schema_pool.sql)
+// ---------------------------------------------------------------------------
+
+export interface PoolPlayer {
+  id: string;
+  name: string;
+  created_at: string;
+}
+
+export type PoolFormat = 'league' | 'knockout';
+export type PoolTournamentStatus = 'setup' | 'active' | 'completed';
+
+export interface PoolTournament {
+  id: string;
+  name: string;
+  format: PoolFormat;
+  status: PoolTournamentStatus;
+  games_per_player: number | null;
+  created_at: string;
+}
+
+export interface PoolRound {
+  id: string;
+  tournament_id: string;
+  name: string;
+  sequence_order: number;
+}
+
+export interface PoolFixture {
+  id: string;
+  round_id: string;
+  player_1_id: string;
+  player_2_id: string | null;
+  player_1_score: number;
+  player_2_score: number;
+  completed: boolean;
+  is_bye: boolean;
+}
+
+export interface PoolStandingsRow {
+  position: number;
+  playerId: string;
+  name: string;
+  played: number;
+  won: number;
+  lost: number;
+  framesWon: number;
+  framesLost: number;
+  frameDifference: number;
+  points: number;
+}
+
 export interface PlayerStat {
   player_id: string;
   player_name: string;

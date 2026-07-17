@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { Player, Week, Fixture } from '@/types';
 import { supabase } from '@/lib/supabase';
+import { generateRoundRobinRounds } from '@/lib/fixtureGenerator';
 
 interface AdminDashboardProps {
   initialPlayers: Player[];
@@ -32,6 +33,11 @@ export default function AdminDashboard({ initialPlayers, initialWeeks, initialFi
   const [editP1Id, setEditP1Id] = useState('');
   const [editP2Id, setEditP2Id] = useState('');
   const [editWeekId, setEditWeekId] = useState('');
+
+  const [genPlayerIds, setGenPlayerIds] = useState<string[]>([]);
+  const [genGamesPerPlayer, setGenGamesPerPlayer] = useState('1');
+  const [genWeekLabel, setGenWeekLabel] = useState('Week');
+  const [isGenerating, setIsGenerating] = useState(false);
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
@@ -71,6 +77,76 @@ export default function AdminDashboard({ initialPlayers, initialWeeks, initialFi
       .single();
     if (error) { alert(error.message); }
     else { setWeeks((prev) => [...prev, data]); setNewWeekName(''); }
+  };
+
+  const toggleGenPlayer = (playerId: string) => {
+    setGenPlayerIds((prev) =>
+      prev.includes(playerId) ? prev.filter((id) => id !== playerId) : [...prev, playerId]
+    );
+  };
+
+  const generateFixtures = async () => {
+    const gpp = parseInt(genGamesPerPlayer, 10);
+    if (genPlayerIds.length < 2) {
+      alert('Select at least 2 players to generate fixtures for.');
+      return;
+    }
+    if (isNaN(gpp) || gpp < 1) {
+      alert('Enter a valid number of games per player (1 or more).');
+      return;
+    }
+
+    setIsGenerating(true);
+    try {
+      const rounds = generateRoundRobinRounds(genPlayerIds, gpp);
+      if (rounds.length === 0) {
+        alert('Could not generate fixtures with those settings.');
+        return;
+      }
+
+      let nextSequence = weeks.length > 0 ? Math.max(...weeks.map((w) => w.sequence_order)) + 1 : 1;
+      const newWeeks: Week[] = [];
+      const newFixtures: Fixture[] = [];
+
+      for (const roundPairs of rounds) {
+        const label = `${genWeekLabel.trim() || 'Week'} ${nextSequence}`;
+        const { data: weekData, error: weekError } = await supabase
+          .from('weeks')
+          .insert([{ name: label, sequence_order: nextSequence }])
+          .select()
+          .single();
+        if (weekError || !weekData) {
+          alert(weekError?.message || 'Failed to create week.');
+          break;
+        }
+        newWeeks.push(weekData);
+        nextSequence += 1;
+
+        if (roundPairs.length === 0) continue;
+
+        const fixtureRows = roundPairs.map(([p1, p2]) => ({
+          week_id: weekData.id,
+          player_1_id: p1,
+          player_2_id: p2,
+          completed: false,
+        }));
+
+        const { data: fixtureData, error: fixtureError } = await supabase
+          .from('fixtures')
+          .insert(fixtureRows)
+          .select();
+        if (fixtureError) {
+          alert(fixtureError.message);
+          break;
+        }
+        if (fixtureData) newFixtures.push(...fixtureData);
+      }
+
+      setWeeks((prev) => [...prev, ...newWeeks]);
+      setFixtures((prev) => [...prev, ...newFixtures]);
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   const createFixture = async (e: React.FormEvent) => {
@@ -154,12 +230,17 @@ export default function AdminDashboard({ initialPlayers, initialWeeks, initialFi
       {/* Header */}
       <div className="flex flex-wrap justify-between items-center bg-charcoal-900 p-4 rounded-xl border border-emerald-950">
         <div>
-          <h1 className="text-2xl font-black tracking-tight text-white">League HQ Dashboard</h1>
+          <h1 className="text-2xl font-black tracking-tight text-white">Darts — League HQ Dashboard</h1>
           <p className="text-xs text-emerald-400 font-medium">Secured Administrative Terminal</p>
         </div>
-        <button onClick={handleSignOut} className="px-4 py-2 bg-charcoal-950 hover:bg-charcoal-800 text-gray-300 text-xs font-bold rounded-lg transition-all">
-          Sign Out
-        </button>
+        <div className="flex items-center gap-2">
+          <a href="/pool/admin" className="px-4 py-2 bg-sky-950/60 border border-sky-800/50 hover:bg-sky-900/60 text-sky-300 text-xs font-bold rounded-lg transition-all">
+            Pool Admin →
+          </a>
+          <button onClick={handleSignOut} className="px-4 py-2 bg-charcoal-950 hover:bg-charcoal-800 text-gray-300 text-xs font-bold rounded-lg transition-all">
+            Sign Out
+          </button>
+        </div>
       </div>
 
       {/* Player & Week Management */}
@@ -205,6 +286,64 @@ export default function AdminDashboard({ initialPlayers, initialWeeks, initialFi
               ))}
             </ul>
           )}
+        </div>
+      </div>
+
+      {/* Auto-Generate Fixtures */}
+      <div className="bg-charcoal-900 border border-amber-900/40 p-5 rounded-xl space-y-4">
+        <div>
+          <h2 className="text-lg font-bold text-white border-b border-charcoal-800 pb-2">Auto-Generate Fixtures</h2>
+          <p className="text-xs text-gray-500 mt-2">
+            Pick your players and how many games each should get, and this creates that many new
+            weeks with random pairings — nobody plays the same opponent twice. Existing weeks and
+            results are never touched.
+          </p>
+        </div>
+
+        <div>
+          <p className="text-xs font-bold text-amber-400 uppercase tracking-widest mb-2">Players ({genPlayerIds.length} selected)</p>
+          {players.length === 0 ? (
+            <p className="text-gray-500 text-sm">Add players first.</p>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 max-h-40 overflow-y-auto">
+              {players.map((p) => (
+                <label key={p.id} className="flex items-center gap-2 text-sm text-gray-300 px-2 py-1.5 bg-charcoal-950 rounded-lg cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={genPlayerIds.includes(p.id)}
+                    onChange={() => toggleGenPlayer(p.id)}
+                    className="accent-amber-600"
+                  />
+                  <span className="truncate">{p.name}</span>
+                </label>
+              ))}
+            </div>
+          )}
+          <div className="flex gap-2 mt-2">
+            <button onClick={() => setGenPlayerIds(players.map((p) => p.id))}
+              className="text-xs text-amber-500 hover:text-amber-400 font-semibold">Select All</button>
+            <button onClick={() => setGenPlayerIds([])}
+              className="text-xs text-gray-500 hover:text-gray-400 font-semibold">Clear</button>
+          </div>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-3">
+          <div>
+            <label className="block text-xs font-bold text-amber-400 uppercase tracking-widest mb-1.5">Games per Player</label>
+            <input type="number" min="1" value={genGamesPerPlayer} onChange={(e) => setGenGamesPerPlayer(e.target.value)}
+              className="w-full bg-charcoal-950 border border-amber-900/60 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500" />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-amber-400 uppercase tracking-widest mb-1.5">Week Label Prefix</label>
+            <input type="text" value={genWeekLabel} onChange={(e) => setGenWeekLabel(e.target.value)}
+              className="w-full bg-charcoal-950 border border-amber-900/60 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500" />
+          </div>
+          <div className="flex items-end">
+            <button onClick={generateFixtures} disabled={isGenerating}
+              className="w-full bg-amber-600 hover:bg-amber-500 disabled:bg-amber-900 disabled:text-amber-700 text-white font-bold text-sm px-4 py-2 rounded-lg transition-colors">
+              {isGenerating ? 'Generating...' : 'Generate Fixtures'}
+            </button>
+          </div>
         </div>
       </div>
 
