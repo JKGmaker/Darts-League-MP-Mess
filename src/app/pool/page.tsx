@@ -34,7 +34,8 @@ export default async function PoolHomePage() {
   return (
     <div className="min-h-screen bg-charcoal-950">
       <header className="relative min-h-[45vh] flex items-end overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-sky-900/40 via-charcoal-950 to-charcoal-950" />
+        <div className="absolute inset-0 bg-cover bg-center bg-no-repeat" style={{ backgroundImage: "url('/hero.jpg')" }} />
+        <div className="absolute inset-0 bg-gradient-to-t from-charcoal-950 via-charcoal-950/60 to-sky-950/40" />
         <div className="relative z-10 w-full max-w-6xl mx-auto px-6 pb-12 pt-24">
           <Link href="/" className="inline-block text-xs font-bold text-gray-300 hover:text-white bg-black/30 px-3 py-1.5 rounded-full mb-6 transition-colors">
             ← MP Mess Home
