@@ -105,7 +105,7 @@ export default function PoolFixturesView({ rounds, fixtures, players }: PoolFixt
                   {f.is_bye ? (
                     <div className="flex items-center justify-center gap-1.5 text-xs text-gray-500 py-1">
                       <span>✓</span>
-                      <span>Bye — advances automatically</span>
+                      <span>Bye — walkover win (2 pts)</span>
                     </div>
                   ) : f.completed ? (
                     <div className="flex items-center justify-center gap-1.5 text-xs text-gray-500 py-1">

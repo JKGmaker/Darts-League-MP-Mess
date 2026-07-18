@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
-import { calculatePoolStandings } from '@/lib/poolUtils';
+import { calculatePoolStandings, splitFixturesByStage } from '@/lib/poolUtils';
 import { PoolTournament, PoolRound, PoolFixture, PoolPlayer } from '@/types';
 import PoolStandingsTable from '@/components/pool/PoolStandingsTable';
 import PoolFixturesView from '@/components/pool/PoolFixturesView';
@@ -39,7 +39,8 @@ export default async function PoolTournamentPage({ params }: { params: { id: str
 
   if (!tournament) notFound();
 
-  const standings = tournament.format === 'league' ? calculatePoolStandings(players, fixtures) : [];
+  const { leagueRounds, playoffRounds, leagueFixtures, playoffFixtures } = splitFixturesByStage(rounds, fixtures);
+  const standings = tournament.format === 'league' ? calculatePoolStandings(players, leagueFixtures) : [];
 
   return (
     <div className="min-h-screen bg-charcoal-950">
@@ -62,7 +63,18 @@ export default async function PoolTournamentPage({ params }: { params: { id: str
         {tournament.format === 'league' ? (
           <>
             <PoolStandingsTable standings={standings} />
-            <PoolFixturesView rounds={rounds} fixtures={fixtures} players={players} />
+            <PoolFixturesView rounds={leagueRounds} fixtures={leagueFixtures} players={players} />
+            {playoffRounds.length > 0 && (
+              <div className="space-y-4">
+                <div className="p-4 bg-gradient-to-r from-amber-950 to-charcoal-900 border border-amber-800/40 rounded-xl">
+                  <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                    <span className="w-2 h-5 bg-amber-400 rounded-sm inline-block"></span>
+                    🏆 Top 8 Playoffs
+                  </h2>
+                </div>
+                <PoolBracketView rounds={playoffRounds} fixtures={playoffFixtures} players={players} tournamentStatus={tournament.status} />
+              </div>
+            )}
           </>
         ) : (
           <PoolBracketView rounds={rounds} fixtures={fixtures} players={players} tournamentStatus={tournament.status} />

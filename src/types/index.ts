@@ -44,6 +44,7 @@ export interface PlayoffMatchRow {
   override_player_1_id: string | null;
   override_player_2_id: string | null;
   override_winner_id: string | null;
+  excluded: boolean;
 }
 
 export interface StandingsRow {
@@ -98,13 +99,18 @@ export interface PoolTournament {
   format: PoolFormat;
   status: PoolTournamentStatus;
   games_per_player: number | null;
+  playoff_after_weeks: number | null;
+  playoffs_generated: boolean;
   created_at: string;
 }
+
+export type PoolRoundStage = 'league' | 'playoff';
 
 export interface PoolRound {
   id: string;
   tournament_id: string;
   name: string;
+  stage: PoolRoundStage;
   sequence_order: number;
 }
 
@@ -117,6 +123,7 @@ export interface PoolFixture {
   player_2_score: number;
   completed: boolean;
   is_bye: boolean;
+  slot_code: string | null;
 }
 
 export interface PoolStandingsRow {

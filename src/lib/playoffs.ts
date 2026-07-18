@@ -95,6 +95,7 @@ export interface ResolvedMatch {
   bestOf: number;
   completed: boolean;
   winner: Player | null;
+  excluded: boolean;
   row?: PlayoffMatchRow;
 }
 
@@ -153,6 +154,13 @@ export function resolveBracket(
     }
     // winner of another match
     const feeder = resolveMatch(source.from);
+    if (feeder.excluded) {
+      // The feeder match has been removed from the bracket (e.g. not enough
+      // players this season) — nothing flows forward from it automatically.
+      // An admin can still manually override this slot to whoever should be
+      // here instead.
+      return { player: null, label: 'Bye', isBye: true };
+    }
     const fromDef = defByCode.get(source.from);
     return {
       player: feeder?.winner || null,
@@ -178,6 +186,7 @@ export function resolveBracket(
       bestOf: row?.best_of ?? defaultBestOf,
       completed: row?.completed ?? false,
       winner: null,
+      excluded: row?.excluded ?? false,
       row,
     };
     cache.set(code, placeholder);

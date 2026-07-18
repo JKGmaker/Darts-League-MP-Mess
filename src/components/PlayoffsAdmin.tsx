@@ -20,6 +20,7 @@ interface Draft {
   ovP2: string;
   ovWinner: string;
   completed: boolean;
+  excluded: boolean;
 }
 
 export default function PlayoffsAdmin({ initialPlayers, initialWeeks, initialFixtures }: PlayoffsAdminProps) {
@@ -38,7 +39,7 @@ export default function PlayoffsAdmin({ initialPlayers, initialWeeks, initialFix
   const defaultBestOf = settings?.default_best_of ?? 5;
 
   const blankDraft = (bo: number): Draft => ({
-    best_of: String(bo), p1: '0', p2: '0', ovP1: '', ovP2: '', ovWinner: '', completed: false,
+    best_of: String(bo), p1: '0', p2: '0', ovP1: '', ovP2: '', ovWinner: '', completed: false, excluded: false,
   });
 
   const draftFromRow = (r: PlayoffMatchRow | undefined, bo: number): Draft => ({
@@ -49,6 +50,7 @@ export default function PlayoffsAdmin({ initialPlayers, initialWeeks, initialFix
     ovP2: r?.override_player_2_id ?? '',
     ovWinner: r?.override_winner_id ?? '',
     completed: r?.completed ?? false,
+    excluded: r?.excluded ?? false,
   });
 
   const buildAllDrafts = (rs: PlayoffMatchRow[], bo: number) => {
@@ -219,6 +221,34 @@ export default function PlayoffsAdmin({ initialPlayers, initialWeeks, initialFix
       override_player_1_id: d.ovP1 || null,
       override_player_2_id: d.ovP2 || null,
       override_winner_id: d.ovWinner || null,
+      excluded: d.excluded,
+    };
+    const { data, error } = await supabase
+      .from('playoff_matches')
+      .upsert(payload, { onConflict: 'bracket,code' })
+      .select()
+      .single();
+    if (error) { alert(error.message); return; }
+    const saved = data as PlayoffMatchRow;
+    applyRow(saved);
+    setDrafts((prev) => ({ ...prev, [key]: draftFromRow(saved, defaultBestOf) }));
+  };
+
+  /** Instantly excludes/restores a match without needing a separate Save click. */
+  const setExcluded = async (bracket: Bracket, code: string, excluded: boolean) => {
+    const key = `${bracket}:${code}`;
+    const d = drafts[key] || blankDraft(defaultBestOf);
+    const payload = {
+      bracket,
+      code,
+      best_of: parseInt(d.best_of, 10) || defaultBestOf,
+      player_1_score: parseInt(d.p1, 10) || 0,
+      player_2_score: parseInt(d.p2, 10) || 0,
+      completed: d.completed,
+      override_player_1_id: d.ovP1 || null,
+      override_player_2_id: d.ovP2 || null,
+      override_winner_id: d.ovWinner || null,
+      excluded,
     };
     const { data, error } = await supabase
       .from('playoff_matches')
@@ -280,7 +310,7 @@ export default function PlayoffsAdmin({ initialPlayers, initialWeeks, initialFix
     const d = drafts[key];
     if (!d) return null;
     return (
-      <div key={m.def.code} className="bg-charcoal-950 border border-emerald-900/30 rounded-lg p-3 space-y-2">
+      <div key={m.def.code} className={`bg-charcoal-950 border rounded-lg p-3 space-y-2 ${d.excluded ? 'border-rose-900/50 opacity-60' : 'border-emerald-900/30'}`}>
         <div className="flex items-center justify-between">
           <span className="text-xs font-bold uppercase tracking-widest text-emerald-500">{m.def.label}</span>
           <div className="flex items-center gap-1">
@@ -292,6 +322,16 @@ export default function PlayoffsAdmin({ initialPlayers, initialWeeks, initialFix
             />
           </div>
         </div>
+
+        {d.excluded && (
+          <div className="flex items-center justify-between gap-2 bg-rose-950/30 border border-rose-900/40 rounded-lg px-3 py-2">
+            <span className="text-[11px] font-bold text-rose-400">Not used this season — hidden from the public bracket</span>
+            <button onClick={() => setExcluded(bracket, m.def.code, false)}
+              className="shrink-0 text-[11px] font-bold text-emerald-400 hover:text-emerald-300 bg-emerald-900/30 hover:bg-emerald-900/50 px-2.5 py-1 rounded transition-colors">
+              Restore
+            </button>
+          </div>
+        )}
 
         {/* current resolved participants */}
         <div className="grid grid-cols-2 gap-2 text-xs">
@@ -350,6 +390,12 @@ export default function PlayoffsAdmin({ initialPlayers, initialWeeks, initialFix
             className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold py-1.5 rounded transition-colors">Save</button>
           <button onClick={() => clearMatch(bracket, m.def.code)}
             className="px-3 bg-rose-900/40 text-rose-400 hover:bg-rose-900/60 text-xs font-bold py-1.5 rounded transition-colors">Clear</button>
+          {!d.excluded && (
+            <button onClick={() => setExcluded(bracket, m.def.code, true)}
+              className="px-3 bg-charcoal-800 text-gray-400 hover:bg-charcoal-700 hover:text-gray-200 text-xs font-bold py-1.5 rounded transition-colors">
+              Remove
+            </button>
+          )}
         </div>
       </div>
     );

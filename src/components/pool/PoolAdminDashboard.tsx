@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { generateRoundRobinRounds, generateKnockoutPairings } from '@/lib/fixtureGenerator';
-import { fixtureWinnerId } from '@/lib/poolUtils';
+import { fixtureWinnerId, calculatePoolStandings, splitFixturesByStage, isRoundComplete, seedTopEightQuarterFinals, buildSemiFinalPairing, buildFinalPairing } from '@/lib/poolUtils';
 import { PoolPlayer, PoolTournament, PoolRound, PoolFixture, PoolFormat } from '@/types';
 
 interface PoolAdminDashboardProps {
@@ -25,6 +25,7 @@ export default function PoolAdminDashboard({ initialPlayers, initialTournaments 
 
   const [newTournamentName, setNewTournamentName] = useState('');
   const [newTournamentFormat, setNewTournamentFormat] = useState<PoolFormat>('league');
+  const [newTournamentPlayoffWeeks, setNewTournamentPlayoffWeeks] = useState('');
 
   const [selectedTournamentId, setSelectedTournamentId] = useState<string | null>(
     initialTournaments[0]?.id || null
@@ -48,6 +49,58 @@ export default function PoolAdminDashboard({ initialPlayers, initialTournaments 
   const latestRound = sortedRounds[sortedRounds.length - 1];
   const latestRoundFixtures = latestRound ? fixtures.filter((f) => f.round_id === latestRound.id) : [];
 
+  const { leagueRounds, playoffRounds, leagueFixtures } = splitFixturesByStage(rounds, fixtures);
+  const sortedLeagueRounds = [...leagueRounds].sort((a, b) => a.sequence_order - b.sequence_order);
+  const sortedPlayoffRounds = [...playoffRounds].sort((a, b) => a.sequence_order - b.sequence_order);
+  const completedLeagueWeeks = sortedLeagueRounds.filter((r) => isRoundComplete(r, leagueFixtures)).length;
+  const latestPlayoffRound = sortedPlayoffRounds[sortedPlayoffRounds.length - 1];
+  const latestPlayoffFixtures = latestPlayoffRound ? fixtures.filter((f) => f.round_id === latestPlayoffRound.id) : [];
+
+  const checkAndGeneratePlayoffs = async (
+    tournament: PoolTournament,
+    currentRounds: PoolRound[],
+    currentFixtures: PoolFixture[],
+    currentEntrantIds: string[]
+  ) => {
+    if (tournament.format !== 'league') return;
+    if (!tournament.playoff_after_weeks) return;
+    if (tournament.playoffs_generated) return;
+    if (currentEntrantIds.length < 8) return;
+
+    const { leagueRounds: lgRounds, leagueFixtures: lgFixtures } = splitFixturesByStage(currentRounds, currentFixtures);
+    const completedWeeks = lgRounds.filter((r) => isRoundComplete(r, lgFixtures)).length;
+    if (completedWeeks < tournament.playoff_after_weeks) return;
+
+    const entrantPlayers = players.filter((p) => currentEntrantIds.includes(p.id));
+    const standings = calculatePoolStandings(entrantPlayers, lgFixtures);
+    const qfPairs = seedTopEightQuarterFinals(standings.map((s) => s.playerId));
+    if (qfPairs.length === 0) return;
+
+    const nextSequence = currentRounds.length > 0 ? Math.max(...currentRounds.map((r) => r.sequence_order)) + 1 : 1;
+    const { data: roundData, error: roundError } = await supabase
+      .from('pool_rounds')
+      .insert([{ tournament_id: tournament.id, name: 'Quarter-Final', stage: 'playoff', sequence_order: nextSequence }])
+      .select()
+      .single();
+    if (roundError || !roundData) return;
+
+    const rows: Partial<PoolFixture>[] = qfPairs.map((p) => ({
+      round_id: roundData.id, player_1_id: p.player1, player_2_id: p.player2,
+      player_1_score: 0, player_2_score: 0, completed: false, is_bye: false, slot_code: p.slotCode,
+    }));
+    const { data: fixtureData, error: fixtureError } = await supabase.from('pool_fixtures').insert(rows).select();
+    if (fixtureError) {
+      await supabase.from('pool_rounds').delete().eq('id', roundData.id);
+      return;
+    }
+
+    await supabase.from('pool_tournaments').update({ playoffs_generated: true }).eq('id', tournament.id);
+
+    setRounds((prev) => [...prev, roundData]);
+    setFixtures((prev) => [...prev, ...((fixtureData as PoolFixture[]) || [])]);
+    setTournaments((prev) => prev.map((t) => (t.id === tournament.id ? { ...t, playoffs_generated: true } : t)));
+  };
+
   const loadTournamentDetail = async (tournamentId: string) => {
     setLoadingDetail(true);
     const [{ data: roundData }, { data: entrantData }] = await Promise.all([
@@ -59,10 +112,17 @@ export default function PoolAdminDashboard({ initialPlayers, initialTournaments 
       ? await supabase.from('pool_fixtures').select('*').in('round_id', roundIds)
       : { data: [] as PoolFixture[] };
 
-    setRounds((roundData as PoolRound[]) || []);
-    setFixtures((fixtureData as PoolFixture[]) || []);
-    setEntrantIds(((entrantData as { player_id: string }[]) || []).map((e) => e.player_id));
+    const loadedRounds = (roundData as PoolRound[]) || [];
+    const loadedFixtures = (fixtureData as PoolFixture[]) || [];
+    const loadedEntrantIds = ((entrantData as { player_id: string }[]) || []).map((e) => e.player_id);
+
+    setRounds(loadedRounds);
+    setFixtures(loadedFixtures);
+    setEntrantIds(loadedEntrantIds);
     setLoadingDetail(false);
+
+    const tour = tournaments.find((t) => t.id === tournamentId);
+    if (tour) await checkAndGeneratePlayoffs(tour, loadedRounds, loadedFixtures, loadedEntrantIds);
   };
 
   useEffect(() => {
@@ -93,15 +153,22 @@ export default function PoolAdminDashboard({ initialPlayers, initialTournaments 
   const createTournament = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTournamentName.trim()) return;
+    const playoffWeeks = parseInt(newTournamentPlayoffWeeks, 10);
     const { data, error } = await supabase
       .from('pool_tournaments')
-      .insert([{ name: newTournamentName.trim(), format: newTournamentFormat, status: 'setup' }])
+      .insert([{
+        name: newTournamentName.trim(),
+        format: newTournamentFormat,
+        status: 'setup',
+        playoff_after_weeks: newTournamentFormat === 'league' && !isNaN(playoffWeeks) && playoffWeeks > 0 ? playoffWeeks : null,
+      }])
       .select()
       .single();
     if (error) alert(error.message);
     else {
       setTournaments((prev) => [data, ...prev]);
       setNewTournamentName('');
+      setNewTournamentPlayoffWeeks('');
       setSelectedTournamentId(data.id);
     }
   };
@@ -157,7 +224,7 @@ export default function PoolAdminDashboard({ initialPlayers, initialTournaments 
       const newRounds: PoolRound[] = [];
       const newFixtures: PoolFixture[] = [];
 
-      for (const pairs of roundsPairs) {
+      for (const round of roundsPairs) {
         const label = `${genWeekLabel.trim() || 'Week'} ${nextSequence}`;
         const { data: roundData, error: roundError } = await supabase
           .from('pool_rounds')
@@ -167,9 +234,15 @@ export default function PoolAdminDashboard({ initialPlayers, initialTournaments 
         if (roundError || !roundData) { alert(roundError?.message || 'Failed to create round.'); break; }
         newRounds.push(roundData);
         nextSequence += 1;
-        if (pairs.length === 0) continue;
 
-        const rows = pairs.map(([p1, p2]) => ({ round_id: roundData.id, player_1_id: p1, player_2_id: p2, player_1_score: 0, player_2_score: 0, completed: false }));
+        const rows: Partial<PoolFixture>[] = round.pairs.map(([p1, p2]) => ({ round_id: roundData.id, player_1_id: p1, player_2_id: p2, player_1_score: 0, player_2_score: 0, completed: false }));
+        // Odd headcount this round — the player sitting out gets a walkover
+        // win (counts for points) rather than just resting unrecorded.
+        if (round.byePlayerId) {
+          rows.push({ round_id: roundData.id, player_1_id: round.byePlayerId, player_2_id: null, player_1_score: 1, player_2_score: 0, completed: true, is_bye: true });
+        }
+        if (rows.length === 0) continue;
+
         const { data: fixtureData, error: fixtureError } = await supabase.from('pool_fixtures').insert(rows).select();
         if (fixtureError) {
           alert(fixtureError.message);
@@ -266,6 +339,58 @@ export default function PoolAdminDashboard({ initialPlayers, initialTournaments 
     }
   };
 
+  const advancePlayoffs = async () => {
+    if (!selectedTournamentId || !latestPlayoffRound) return;
+    if (latestPlayoffFixtures.some((f) => !f.completed)) {
+      alert('Enter results for every playoff match first.');
+      return;
+    }
+
+    if (latestPlayoffRound.name === 'Final') {
+      await markTournamentStatus('completed');
+      alert('Playoffs complete — champion decided!');
+      return;
+    }
+
+    let nextPairs: { slotCode: string; player1: string; player2: string }[] | null = null;
+    let nextRoundName = '';
+    if (latestPlayoffRound.name === 'Quarter-Final') {
+      nextPairs = buildSemiFinalPairing(latestPlayoffFixtures);
+      nextRoundName = 'Semi-Final';
+    } else if (latestPlayoffRound.name === 'Semi-Final') {
+      const final = buildFinalPairing(latestPlayoffFixtures);
+      nextPairs = final ? [final] : null;
+      nextRoundName = 'Final';
+    }
+    if (!nextPairs) { alert('Could not determine the winners for the next round — check every match has a result.'); return; }
+
+    setIsGenerating(true);
+    try {
+      const nextSequence = Math.max(...rounds.map((r) => r.sequence_order)) + 1;
+      const { data: roundData, error: roundError } = await supabase
+        .from('pool_rounds')
+        .insert([{ tournament_id: selectedTournamentId, name: nextRoundName, stage: 'playoff', sequence_order: nextSequence }])
+        .select()
+        .single();
+      if (roundError || !roundData) { alert(roundError?.message || 'Failed to create round.'); return; }
+
+      const rows: Partial<PoolFixture>[] = nextPairs.map((p) => ({
+        round_id: roundData.id, player_1_id: p.player1, player_2_id: p.player2,
+        player_1_score: 0, player_2_score: 0, completed: false, is_bye: false, slot_code: p.slotCode,
+      }));
+      const { data: fixtureData, error: fixtureError } = await supabase.from('pool_fixtures').insert(rows).select();
+      if (fixtureError) {
+        alert(fixtureError.message);
+        await supabase.from('pool_rounds').delete().eq('id', roundData.id);
+        return;
+      }
+      setRounds((prev) => [...prev, roundData]);
+      setFixtures((prev) => [...prev, ...((fixtureData as PoolFixture[]) || [])]);
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   const deleteRound = async (roundId: string, roundName: string) => {
     if (!confirm(`Delete round "${roundName}" and all its fixtures? Use this to clean up a broken/empty round.`)) return;
     const { error } = await supabase.from('pool_rounds').delete().eq('id', roundId);
@@ -283,11 +408,13 @@ export default function PoolAdminDashboard({ initialPlayers, initialTournaments 
       return;
     }
     const { error } = await supabase.from('pool_fixtures').update({ player_1_score: s1, player_2_score: s2, completed: true }).eq('id', fixtureId);
-    if (error) alert(error.message);
-    else {
-      setFixtures((prev) => prev.map((f) => (f.id === fixtureId ? { ...f, player_1_score: s1, player_2_score: s2, completed: true } : f)));
-      setEditingFixtureId(null); setScoreP1(''); setScoreP2('');
-    }
+    if (error) { alert(error.message); return; }
+
+    const updatedFixtures = fixtures.map((f) => (f.id === fixtureId ? { ...f, player_1_score: s1, player_2_score: s2, completed: true } : f));
+    setFixtures(updatedFixtures);
+    setEditingFixtureId(null); setScoreP1(''); setScoreP2('');
+
+    if (selectedTournament) await checkAndGeneratePlayoffs(selectedTournament, rounds, updatedFixtures, entrantIds);
   };
 
   const deleteFixture = async (fixtureId: string) => {
@@ -295,6 +422,75 @@ export default function PoolAdminDashboard({ initialPlayers, initialTournaments 
     const { error } = await supabase.from('pool_fixtures').delete().eq('id', fixtureId);
     if (error) alert(error.message);
     else setFixtures((prev) => prev.filter((f) => f.id !== fixtureId));
+  };
+
+  const renderFixtureCard = (f: PoolFixture) => {
+    const p1 = playerMap.get(f.player_1_id);
+    const p2 = f.player_2_id ? playerMap.get(f.player_2_id) : null;
+    const isEditing = editingFixtureId === f.id;
+    return (
+      <div key={f.id} className="bg-charcoal-950 border border-sky-900/30 rounded-lg p-3 space-y-2">
+        {f.slot_code && <p className="text-[10px] font-bold text-amber-500 uppercase tracking-widest">{f.slot_code}</p>}
+        <div className="flex items-center justify-between text-sm">
+          <span className={`font-bold truncate max-w-[90px] ${f.is_bye || (f.completed && f.player_1_score > f.player_2_score) ? 'text-sky-400' : 'text-gray-200'}`}>{p1?.name || '?'}</span>
+          <span className="font-mono font-black text-white px-2">
+            {f.is_bye ? 'BYE' : f.completed ? `${f.player_1_score}-${f.player_2_score}` : 'VS'}
+          </span>
+          <span className={`font-bold truncate max-w-[90px] text-right ${f.completed && f.player_2_score > f.player_1_score ? 'text-sky-400' : 'text-gray-200'}`}>{f.is_bye ? '—' : p2?.name || '?'}</span>
+        </div>
+        {!f.is_bye && (
+          isEditing ? (
+            <div className="space-y-2">
+              <div className="flex gap-2 items-center justify-center">
+                <input type="number" min="0" value={scoreP1} onChange={(e) => setScoreP1(e.target.value)} placeholder="P1"
+                  className="w-14 bg-charcoal-900 border border-sky-700 rounded px-2 py-1 text-sm text-white text-center focus:outline-none" />
+                <span className="text-gray-500 text-xs">-</span>
+                <input type="number" min="0" value={scoreP2} onChange={(e) => setScoreP2(e.target.value)} placeholder="P2"
+                  className="w-14 bg-charcoal-900 border border-sky-700 rounded px-2 py-1 text-sm text-white text-center focus:outline-none" />
+              </div>
+              <div className="flex gap-2">
+                <button onClick={() => submitScore(f.id)} className="flex-1 bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold py-1.5 rounded transition-colors">Save</button>
+                <button onClick={() => { setEditingFixtureId(null); setScoreP1(''); setScoreP2(''); }} className="text-gray-500 hover:text-gray-300 text-xs px-2">Cancel</button>
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-1">
+              <button onClick={() => { setEditingFixtureId(f.id); setScoreP1(f.completed ? String(f.player_1_score) : ''); setScoreP2(f.completed ? String(f.player_2_score) : ''); }}
+                className={`text-xs font-bold py-1.5 rounded transition-colors ${f.completed ? 'bg-charcoal-800 text-gray-400 hover:bg-charcoal-700' : 'bg-sky-900/40 text-sky-400 hover:bg-sky-900/60'}`}>
+                {f.completed ? 'Edit Score' : 'Enter Score'}
+              </button>
+              <button onClick={() => deleteFixture(f.id)} className="text-xs font-bold py-1.5 rounded transition-colors bg-rose-900/40 text-rose-400 hover:bg-rose-900/60">Delete</button>
+            </div>
+          )
+        )}
+      </div>
+    );
+  };
+
+  const renderRoundBlock = (r: PoolRound) => {
+    const rFixtures = fixtures.filter((f) => f.round_id === r.id);
+    if (rFixtures.length === 0) {
+      return (
+        <div key={r.id} className="border border-rose-900/40 bg-rose-950/10 rounded-lg p-3">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-bold text-rose-400 uppercase tracking-widest">{r.name} — empty / broken round</p>
+            <button onClick={() => deleteRound(r.id, r.name)} className="text-[10px] font-bold text-rose-500 hover:text-rose-400">Delete Round</button>
+          </div>
+          <p className="text-xs text-gray-500 mt-1">No fixtures were generated for this round — likely a leftover from a failed generation. Delete it, then try generating again.</p>
+        </div>
+      );
+    }
+    return (
+      <div key={r.id}>
+        <div className="flex items-center justify-between mb-2">
+          <p className="text-xs font-bold text-sky-500 uppercase tracking-widest">{r.name}</p>
+          <button onClick={() => deleteRound(r.id, r.name)} className="text-[10px] font-bold text-rose-500 hover:text-rose-400">Delete Round</button>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          {rFixtures.map(renderFixtureCard)}
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -327,15 +523,25 @@ export default function PoolAdminDashboard({ initialPlayers, initialTournaments 
       {/* Tournaments */}
       <div className="bg-charcoal-900 border border-sky-950 p-5 rounded-xl space-y-4">
         <h2 className="text-lg font-bold text-white border-b border-charcoal-800 pb-2">Tournaments</h2>
-        <form onSubmit={createTournament} className="grid gap-2 sm:grid-cols-3">
-          <input type="text" placeholder="Tournament name" value={newTournamentName} onChange={(e) => setNewTournamentName(e.target.value)}
-            className="bg-charcoal-950 border border-sky-900/60 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-sky-500" />
-          <select value={newTournamentFormat} onChange={(e) => setNewTournamentFormat(e.target.value as PoolFormat)}
-            className="bg-charcoal-950 border border-sky-900/60 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-sky-500">
-            <option value="league">League</option>
-            <option value="knockout">Knockout</option>
-          </select>
-          <button type="submit" className="bg-sky-600 hover:bg-sky-500 text-white font-bold text-sm px-4 py-2 rounded-lg transition-colors">Create Tournament</button>
+        <form onSubmit={createTournament} className="space-y-2">
+          <div className="grid gap-2 sm:grid-cols-3">
+            <input type="text" placeholder="Tournament name" value={newTournamentName} onChange={(e) => setNewTournamentName(e.target.value)}
+              className="bg-charcoal-950 border border-sky-900/60 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-sky-500" />
+            <select value={newTournamentFormat} onChange={(e) => setNewTournamentFormat(e.target.value as PoolFormat)}
+              className="bg-charcoal-950 border border-sky-900/60 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-sky-500">
+              <option value="league">League</option>
+              <option value="knockout">Knockout</option>
+            </select>
+            <button type="submit" className="bg-sky-600 hover:bg-sky-500 text-white font-bold text-sm px-4 py-2 rounded-lg transition-colors">Create Tournament</button>
+          </div>
+          {newTournamentFormat === 'league' && (
+            <div className="flex items-center gap-2">
+              <label className="text-xs font-bold text-sky-400 uppercase tracking-widest whitespace-nowrap">Top 8 playoffs after</label>
+              <input type="number" min="1" placeholder="e.g. 8" value={newTournamentPlayoffWeeks} onChange={(e) => setNewTournamentPlayoffWeeks(e.target.value)}
+                className="w-24 bg-charcoal-950 border border-sky-900/60 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-sky-500" />
+              <span className="text-xs text-gray-500">completed weeks (leave blank for no automatic playoffs)</span>
+            </div>
+          )}
         </form>
 
         {tournaments.length > 0 && (
@@ -435,75 +641,51 @@ export default function PoolAdminDashboard({ initialPlayers, initialTournaments 
               )}
 
               {/* Fixtures Management */}
-              {rounds.length > 0 && (
-                <div className="space-y-4">
-                  <p className="text-xs font-bold text-sky-400 uppercase tracking-widest">Fixtures</p>
-                  {sortedRounds.map((r) => {
-                    const rFixtures = fixtures.filter((f) => f.round_id === r.id);
-                    if (rFixtures.length === 0) {
-                      return (
-                        <div key={r.id} className="border border-rose-900/40 bg-rose-950/10 rounded-lg p-3">
-                          <div className="flex items-center justify-between">
-                            <p className="text-xs font-bold text-rose-400 uppercase tracking-widest">{r.name} — empty / broken round</p>
-                            <button onClick={() => deleteRound(r.id, r.name)} className="text-[10px] font-bold text-rose-500 hover:text-rose-400">Delete Round</button>
-                          </div>
-                          <p className="text-xs text-gray-500 mt-1">No fixtures were generated for this round — likely a leftover from a failed generation. Delete it, then use &quot;Generate Next Round&quot; again.</p>
-                        </div>
-                      );
-                    }
-                    return (
-                      <div key={r.id}>
-                        <div className="flex items-center justify-between mb-2">
-                          <p className="text-xs font-bold text-sky-500 uppercase tracking-widest">{r.name}</p>
-                          <button onClick={() => deleteRound(r.id, r.name)} className="text-[10px] font-bold text-rose-500 hover:text-rose-400">Delete Round</button>
-                        </div>
-                        <div className="grid gap-3 sm:grid-cols-2">
-                          {rFixtures.map((f) => {
-                            const p1 = playerMap.get(f.player_1_id);
-                            const p2 = f.player_2_id ? playerMap.get(f.player_2_id) : null;
-                            const isEditing = editingFixtureId === f.id;
-                            return (
-                              <div key={f.id} className="bg-charcoal-950 border border-sky-900/30 rounded-lg p-3 space-y-2">
-                                <div className="flex items-center justify-between text-sm">
-                                  <span className={`font-bold truncate max-w-[90px] ${f.is_bye || (f.completed && f.player_1_score > f.player_2_score) ? 'text-sky-400' : 'text-gray-200'}`}>{p1?.name || '?'}</span>
-                                  <span className="font-mono font-black text-white px-2">
-                                    {f.is_bye ? 'BYE' : f.completed ? `${f.player_1_score}-${f.player_2_score}` : 'VS'}
-                                  </span>
-                                  <span className={`font-bold truncate max-w-[90px] text-right ${f.completed && f.player_2_score > f.player_1_score ? 'text-sky-400' : 'text-gray-200'}`}>{f.is_bye ? '—' : p2?.name || '?'}</span>
-                                </div>
-                                {!f.is_bye && (
-                                  isEditing ? (
-                                    <div className="space-y-2">
-                                      <div className="flex gap-2 items-center justify-center">
-                                        <input type="number" min="0" value={scoreP1} onChange={(e) => setScoreP1(e.target.value)} placeholder="P1"
-                                          className="w-14 bg-charcoal-900 border border-sky-700 rounded px-2 py-1 text-sm text-white text-center focus:outline-none" />
-                                        <span className="text-gray-500 text-xs">-</span>
-                                        <input type="number" min="0" value={scoreP2} onChange={(e) => setScoreP2(e.target.value)} placeholder="P2"
-                                          className="w-14 bg-charcoal-900 border border-sky-700 rounded px-2 py-1 text-sm text-white text-center focus:outline-none" />
-                                      </div>
-                                      <div className="flex gap-2">
-                                        <button onClick={() => submitScore(f.id)} className="flex-1 bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold py-1.5 rounded transition-colors">Save</button>
-                                        <button onClick={() => { setEditingFixtureId(null); setScoreP1(''); setScoreP2(''); }} className="text-gray-500 hover:text-gray-300 text-xs px-2">Cancel</button>
-                                      </div>
-                                    </div>
-                                  ) : (
-                                    <div className="grid grid-cols-2 gap-1">
-                                      <button onClick={() => { setEditingFixtureId(f.id); setScoreP1(f.completed ? String(f.player_1_score) : ''); setScoreP2(f.completed ? String(f.player_2_score) : ''); }}
-                                        className={`text-xs font-bold py-1.5 rounded transition-colors ${f.completed ? 'bg-charcoal-800 text-gray-400 hover:bg-charcoal-700' : 'bg-sky-900/40 text-sky-400 hover:bg-sky-900/60'}`}>
-                                        {f.completed ? 'Edit Score' : 'Enter Score'}
-                                      </button>
-                                      <button onClick={() => deleteFixture(f.id)} className="text-xs font-bold py-1.5 rounded transition-colors bg-rose-900/40 text-rose-400 hover:bg-rose-900/60">Delete</button>
-                                    </div>
-                                  )
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
+              {selectedTournament.format === 'league' ? (
+                <>
+                  {selectedTournament.playoff_after_weeks != null && (
+                    <div className="border border-amber-700/40 bg-amber-900/10 rounded-xl p-4">
+                      <p className="text-sm font-bold text-amber-300">🏆 Top 8 Playoffs</p>
+                      {selectedTournament.playoffs_generated ? (
+                        <p className="text-xs text-emerald-400 mt-1">Bracket generated — see below.</p>
+                      ) : (
+                        <p className="text-xs text-gray-400 mt-1">
+                          {completedLeagueWeeks} of {selectedTournament.playoff_after_weeks} weeks completed.
+                          {entrantIds.length < 8 && ' Needs at least 8 entrants.'} The top 8 will be seeded (1v8, 2v7, 3v6, 4v5) automatically once ready.
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {sortedLeagueRounds.length > 0 && (
+                    <div className="space-y-4">
+                      <p className="text-xs font-bold text-sky-400 uppercase tracking-widest">League Fixtures</p>
+                      {sortedLeagueRounds.map(renderRoundBlock)}
+                    </div>
+                  )}
+
+                  {sortedPlayoffRounds.length > 0 && (
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between flex-wrap gap-2">
+                        <p className="text-xs font-bold text-amber-400 uppercase tracking-widest">Playoff Bracket</p>
+                        {selectedTournament.status !== 'completed' && (
+                          <button onClick={advancePlayoffs} disabled={isGenerating}
+                            className="bg-amber-600 hover:bg-amber-500 disabled:bg-amber-900 disabled:text-amber-700 text-white font-bold text-xs px-3 py-1.5 rounded-lg transition-colors">
+                            {isGenerating ? 'Generating...' : latestPlayoffRound?.name === 'Final' ? 'Confirm Champion' : 'Advance to Next Round'}
+                          </button>
+                        )}
                       </div>
-                    );
-                  })}
-                </div>
+                      {sortedPlayoffRounds.map(renderRoundBlock)}
+                    </div>
+                  )}
+                </>
+              ) : (
+                rounds.length > 0 && (
+                  <div className="space-y-4">
+                    <p className="text-xs font-bold text-sky-400 uppercase tracking-widest">Fixtures</p>
+                    {sortedRounds.map(renderRoundBlock)}
+                  </div>
+                )
               )}
             </>
           )}

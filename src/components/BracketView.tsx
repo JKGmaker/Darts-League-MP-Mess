@@ -71,7 +71,8 @@ function MatchCard({ match }: { match: ResolvedMatch }) {
 }
 
 export default function BracketView({ matches, locked }: BracketViewProps) {
-  const rounds = Array.from(new Set(matches.map((m) => m.def.round))).sort((a, b) => a - b);
+  const visibleMatches = matches.filter((m) => !m.excluded);
+  const rounds = Array.from(new Set(visibleMatches.map((m) => m.def.round))).sort((a, b) => a - b);
 
   return (
     <div className="space-y-4">
@@ -85,7 +86,7 @@ export default function BracketView({ matches, locked }: BracketViewProps) {
       <div className="overflow-x-auto no-scrollbar pb-2">
         <div className="flex gap-4 min-w-min">
           {rounds.map((r) => {
-            const roundMatches = matches.filter((m) => m.def.round === r);
+            const roundMatches = visibleMatches.filter((m) => m.def.round === r);
             const roundLabel = roundMatches[0]?.def.roundLabel || `Round ${r}`;
             return (
               <div key={r} className="flex flex-col gap-3">

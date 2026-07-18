@@ -108,7 +108,7 @@ export default function AdminDashboard({ initialPlayers, initialWeeks, initialFi
       const newWeeks: Week[] = [];
       const newFixtures: Fixture[] = [];
 
-      for (const roundPairs of rounds) {
+      for (const round of rounds) {
         const label = `${genWeekLabel.trim() || 'Week'} ${nextSequence}`;
         const { data: weekData, error: weekError } = await supabase
           .from('weeks')
@@ -122,9 +122,9 @@ export default function AdminDashboard({ initialPlayers, initialWeeks, initialFi
         newWeeks.push(weekData);
         nextSequence += 1;
 
-        if (roundPairs.length === 0) continue;
+        if (round.pairs.length === 0) continue;
 
-        const fixtureRows = roundPairs.map(([p1, p2]) => ({
+        const fixtureRows = round.pairs.map(([p1, p2]) => ({
           week_id: weekData.id,
           player_1_id: p1,
           player_2_id: p2,
