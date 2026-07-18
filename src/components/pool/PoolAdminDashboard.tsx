@@ -235,7 +235,7 @@ export default function PoolAdminDashboard({ initialPlayers, initialTournaments 
         newRounds.push(roundData);
         nextSequence += 1;
 
-        const rows: Partial<PoolFixture>[] = round.pairs.map(([p1, p2]) => ({ round_id: roundData.id, player_1_id: p1, player_2_id: p2, player_1_score: 0, player_2_score: 0, completed: false }));
+        const rows: Partial<PoolFixture>[] = round.pairs.map(([p1, p2]) => ({ round_id: roundData.id, player_1_id: p1, player_2_id: p2, player_1_score: 0, player_2_score: 0, completed: false, is_bye: false }));
         // Odd headcount this round — the player sitting out gets a walkover
         // win (counts for points) rather than just resting unrecorded.
         if (round.byePlayerId) {
