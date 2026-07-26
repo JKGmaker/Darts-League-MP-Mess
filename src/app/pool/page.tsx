@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { PoolTournament } from '@/types';
+import PoolRulesModal from '@/components/pool/PoolRulesModal';
 
 export const revalidate = 30;
 
@@ -78,6 +79,8 @@ export default async function PoolHomePage() {
             ))}
           </div>
         )}
+
+        <PoolRulesModal />
       </main>
 
       <footer className="border-t border-sky-900/20 mt-12 py-6 text-center text-xs text-gray-600">
