@@ -19,6 +19,9 @@ export default function AdminDashboard({ initialPlayers, initialWeeks, initialFi
   const [newPlayerName, setNewPlayerName] = useState('');
   const [newWeekName, setNewWeekName] = useState('');
 
+  const [editingPlayerId, setEditingPlayerId] = useState<string | null>(null);
+  const [editPlayerName, setEditPlayerName] = useState('');
+
   const [selectedWeek, setSelectedWeek] = useState('');
   const [p1Id, setP1Id] = useState('');
   const [p2Id, setP2Id] = useState('');
@@ -54,6 +57,28 @@ export default function AdminDashboard({ initialPlayers, initialWeeks, initialFi
       .single();
     if (error) { alert(error.message); }
     else { setPlayers((prev) => [...prev, data]); setNewPlayerName(''); }
+  };
+
+  const startEditPlayer = (p: Player) => {
+    setEditingPlayerId(p.id);
+    setEditPlayerName(p.name);
+  };
+
+  const cancelEditPlayer = () => {
+    setEditingPlayerId(null);
+    setEditPlayerName('');
+  };
+
+  const renamePlayer = async (playerId: string) => {
+    const trimmed = editPlayerName.trim();
+    if (!trimmed) return;
+    const { error } = await supabase.from('players').update({ name: trimmed }).eq('id', playerId);
+    if (error) { alert(error.message); }
+    else {
+      setPlayers((prev) => prev.map((p) => (p.id === playerId ? { ...p, name: trimmed } : p)));
+      setEditingPlayerId(null);
+      setEditPlayerName('');
+    }
   };
 
   const deletePlayer = async (playerId: string, playerName: string) => {
@@ -256,12 +281,39 @@ export default function AdminDashboard({ initialPlayers, initialWeeks, initialFi
           {players.length > 0 && (
             <ul className="space-y-1 max-h-48 overflow-y-auto">
               {players.map((p) => (
-                <li key={p.id} className="flex items-center justify-between text-sm text-gray-300 px-3 py-1.5 bg-charcoal-950 rounded-lg">
-                  <span>{p.name}</span>
-                  <button onClick={() => deletePlayer(p.id, p.name)}
-                    className="text-rose-500 hover:text-rose-400 text-xs font-bold ml-2 transition-colors">
-                    Delete
-                  </button>
+                <li key={p.id} className="flex items-center justify-between text-sm text-gray-300 px-3 py-1.5 bg-charcoal-950 rounded-lg gap-2">
+                  {editingPlayerId === p.id ? (
+                    <>
+                      <input
+                        type="text"
+                        value={editPlayerName}
+                        onChange={(e) => setEditPlayerName(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') renamePlayer(p.id); if (e.key === 'Escape') cancelEditPlayer(); }}
+                        autoFocus
+                        className="flex-1 bg-charcoal-900 border border-emerald-900/60 rounded-lg px-2 py-1 text-sm text-white focus:outline-none focus:border-emerald-500"
+                      />
+                      <button onClick={() => renamePlayer(p.id)}
+                        className="text-emerald-500 hover:text-emerald-400 text-xs font-bold transition-colors">
+                        Save
+                      </button>
+                      <button onClick={cancelEditPlayer}
+                        className="text-gray-500 hover:text-gray-400 text-xs font-bold transition-colors">
+                        Cancel
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <span className="flex-1 truncate">{p.name}</span>
+                      <button onClick={() => startEditPlayer(p)}
+                        className="text-amber-400 hover:text-amber-300 text-xs font-bold transition-colors">
+                        Rename
+                      </button>
+                      <button onClick={() => deletePlayer(p.id, p.name)}
+                        className="text-rose-500 hover:text-rose-400 text-xs font-bold transition-colors">
+                        Delete
+                      </button>
+                    </>
+                  )}
                 </li>
               ))}
             </ul>
