@@ -43,20 +43,12 @@ export default async function PoolHomePage() {
           </Link>
           <h1 className="text-5xl sm:text-7xl font-black text-white tracking-tight leading-none drop-shadow-lg">MP Mess</h1>
           <h2 className="text-4xl sm:text-6xl font-black text-sky-400 tracking-tight leading-none drop-shadow-lg">Pool</h2>
-          <div className="flex flex-wrap gap-3 mt-5">
-            <Link
-              href="/darts"
-              className="inline-flex items-center gap-2 text-sm font-bold text-amber-300 hover:text-amber-200 bg-amber-950/60 border border-amber-800/50 px-4 py-2 rounded-full transition-colors"
-            >
-              🎯 Switch to MP Mess Darts
-            </Link>
-            <Link
-              href="/tournament"
-              className="inline-flex items-center gap-2 text-sm font-bold text-violet-300 hover:text-violet-200 bg-violet-950/60 border border-violet-800/50 px-4 py-2 rounded-full transition-colors"
-            >
-              🏆 1-Day Tournament
-            </Link>
-          </div>
+          <Link
+            href="/darts"
+            className="inline-flex items-center gap-2 mt-5 text-sm font-bold text-amber-300 hover:text-amber-200 bg-amber-950/60 border border-amber-800/50 px-4 py-2 rounded-full transition-colors"
+          >
+            🎯 Switch to MP Mess Darts
+          </Link>
         </div>
       </header>
 
