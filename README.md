@@ -1,57 +1,116 @@
-# MABB Registration 2026/27
+# 🎯 MP Mess Darts League
 
-Online club registration for the Midland Area Basketball Board. Clubs sign in with
-credentials you issue, enter players per age group and team (with playing-up
-sections), and fees calculate live. You control everything from the admin dashboard.
+A premium, mobile-optimised, real-time darts league web application.
 
-## Features
+**Tech Stack:** Next.js 14 (App Router) · Tailwind CSS · Supabase (Database + Auth)  
+**Theme:** Irish Sports — Charcoal · Emerald Green · Amber Gold
 
-- **Club logins** - you create each club's email + password from the admin panel
-- **Admin dashboard** - every club's player counts, teams, fees due, last activity, league total, CSV export of all entries
-- **Registration deadlines** - separate juvenile and senior cutoffs, set from the dashboard:
-  - After the juvenile deadline, juvenile rosters become read-only for clubs
-  - After the senior deadline, senior rosters become read-only
-  - After BOTH deadlines, clubs can no longer sign in at all
-  - Locks are enforced by database row-level security, not just the browser, so they cannot be bypassed
-- **Autosave** - every entry saves as the club types
-- Fee rules mirror the registration spreadsheet: 12 EUR juvenile / 2 EUR playing up,
-  20 EUR senior / 15 EUR playing up, 35/75 EUR team fees, 20 EUR coaches,
-  affiliation and cup fees applied automatically
+---
 
-## Setup (once, ~20 minutes)
+## 🚀 Quick Start
 
-### 1. Supabase
-1. Create a free project at supabase.com
-2. SQL Editor -> New query -> paste the whole of `supabase/schema.sql` -> Run
-3. Authentication -> Users -> Add user: your own admin email + password (tick auto-confirm)
-4. Copy that user's UUID from the users list, then run in SQL Editor:
-   `insert into profiles (id, role, club_name) values ('YOUR-UUID', 'admin', 'MABB Admin');`
-5. Project Settings -> API: copy the Project URL, anon key, and service_role key
+### 1. Clone & Install
 
-### 2. Local run (optional)
-```
+```bash
+git clone https://github.com/YOUR_USERNAME/mp-mess-darts-league.git
+cd mp-mess-darts-league
 npm install
-cp .env.example .env.local   # paste in your three Supabase values
-npm run dev                  # http://localhost:3000
 ```
 
-### 3. Netlify
-1. Push this folder to a GitHub repo
-2. Netlify -> Add new site -> Import from GitHub -> pick the repo
-3. Site settings -> Environment variables: add the three values from `.env.example`
-4. Deploy. Sign in with your admin account and add your first club.
+### 2. Set Up Supabase
 
-## Running costs
+1. Create a free project at [supabase.com](https://supabase.com)
+2. Go to **SQL Editor** and paste + run the contents of `schema.sql`
+3. Go to **Authentication → Users** and create an admin user (email + password)
+4. Go to **Project Settings → API** and copy your **Project URL** and **anon public key**
 
-Netlify free tier + Supabase free tier = 0 EUR/month for this usage. Optional
-custom domain ~10-15 EUR/year. Note: free Supabase projects pause after 7 days
-of inactivity - restore takes one click in their dashboard, or keep it awake
-with a scheduled ping during registration season.
+### 3. Configure Environment Variables
 
-## Notes
+```bash
+cp .env.local.example .env.local
+```
 
-- Coach entries stay open until the LATER of the two deadlines, then lock.
-- To change a roster after a deadline, either move the deadline forward
-  temporarily in the dashboard, or edit directly in Supabase (admin RLS allows it).
-- Passwords: minimum 8 characters when creating clubs. To reset a club's
-  password, use Supabase Dashboard -> Authentication -> Users -> reset.
+Edit `.env.local`:
+```env
+NEXT_PUBLIC_SUPABASE_URL=https://your-project-ref.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key-here
+```
+
+### 4. Run Locally
+
+```bash
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000)
+
+---
+
+## 📁 Project Structure
+
+```
+src/
+├── app/
+│   ├── layout.tsx          # Root layout & metadata
+│   ├── page.tsx            # Public home: standings + fixtures
+│   ├── login/page.tsx      # Admin login
+│   └── admin/page.tsx      # Protected admin dashboard
+├── components/
+│   ├── LeagueTable.tsx     # Standings grid
+│   ├── PublicFixtures.tsx  # Weekly fixtures tabs
+│   └── AdminDashboard.tsx  # Score entry + roster management
+├── lib/
+│   ├── supabase.ts         # Supabase client
+│   └── utils.ts            # Standings calculation engine
+└── types/
+    └── index.ts            # TypeScript interfaces
+schema.sql                  # Run this in Supabase SQL Editor
+```
+
+---
+
+## 🌐 Deploy to Vercel
+
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new)
+
+1. Push this repo to GitHub
+2. Import into [Vercel](https://vercel.com)
+3. Add your environment variables in the Vercel dashboard
+4. Deploy — done!
+
+---
+
+## 📋 Scoring Rules
+
+| Result | Points |
+|--------|--------|
+| Win    | 2 pts  |
+| Loss   | 0 pts  |
+
+**Tiebreaker order:**
+1. Points
+2. Head-to-head record
+3. Leg difference (+/-)
+
+---
+
+## 🔐 Admin Access
+
+- Visit `/login` and sign in with the Supabase auth user you created
+- From the admin dashboard you can:
+  - Add / manage players
+  - Create league weeks / stages
+  - Schedule fixtures
+  - Enter and edit match scores
+
+---
+
+## 📦 Required Additional Package
+
+The admin auth guard uses `@supabase/auth-helpers-nextjs`. Install it:
+
+```bash
+npm install @supabase/auth-helpers-nextjs
+```
+
+Then update `package.json` accordingly before committing.

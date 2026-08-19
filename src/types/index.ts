@@ -139,6 +139,69 @@ export interface PoolStandingsRow {
   points: number;
 }
 
+// ---------------------------------------------------------------------------
+// One-Day Tournament (separate module, own tables — see
+// schema_day_tournament.sql). A single-event knockout that can run for
+// either Darts or Pool, singles or doubles, with an optional "pots" draw.
+// ---------------------------------------------------------------------------
+
+export type DayTournamentSport = 'darts' | 'pool';
+export type DayTournamentMode = 'singles' | 'doubles';
+export type DayTournamentPotMode = 'single' | 'multiple';
+export type DayTournamentStatus = 'setup' | 'paired' | 'active' | 'completed';
+
+export interface DayTournament {
+  id: string;
+  name: string;
+  event_date: string | null;
+  sport: DayTournamentSport;
+  mode: DayTournamentMode;
+  format: 'knockout';
+  legs_per_game: number;
+  pot_mode: DayTournamentPotMode;
+  pot_count: number;
+  status: DayTournamentStatus;
+  created_at: string;
+}
+
+export interface DayTournamentEntrant {
+  id: string;
+  tournament_id: string;
+  name: string;
+  pot_number: number;
+  created_at: string;
+}
+
+export interface DayTournamentCompetitor {
+  id: string;
+  tournament_id: string;
+  display_name: string;
+  entrant_1_id: string;
+  entrant_2_id: string | null;
+  pot_number: number | null;
+  created_at: string;
+}
+
+export interface DayTournamentRound {
+  id: string;
+  tournament_id: string;
+  name: string;
+  sequence_order: number;
+  created_at: string;
+}
+
+export interface DayTournamentFixture {
+  id: string;
+  round_id: string;
+  competitor_1_id: string;
+  competitor_2_id: string | null;
+  competitor_1_legs: number;
+  competitor_2_legs: number;
+  completed: boolean;
+  is_bye: boolean;
+  created_at: string;
+}
+
 export interface PlayerStat {
   player_id: string;
   player_name: string;

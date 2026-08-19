@@ -17,8 +17,8 @@ export default function LandingPage() {
         </div>
       </header>
 
-      <main className="flex-1 max-w-4xl mx-auto w-full px-6 py-10">
-        <div className="grid gap-5 sm:grid-cols-2">
+      <main className="flex-1 max-w-5xl mx-auto w-full px-6 py-10">
+        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           <Link
             href="/darts"
             className="group relative flex flex-col items-center justify-center gap-3 px-6 py-12 rounded-3xl bg-gradient-to-br from-amber-600 to-amber-800 hover:from-amber-500 hover:to-amber-700 text-white shadow-xl shadow-amber-950/40 transition-all duration-200 hover:scale-[1.02] active:scale-100"
@@ -38,6 +38,17 @@ export default function LandingPage() {
             <div className="text-center">
               <p className="text-2xl font-black tracking-wide leading-none">MP Mess Pool</p>
               <p className="text-xs font-semibold text-sky-100/90 mt-2">Tournaments · Knockouts · Leagues</p>
+            </div>
+          </Link>
+
+          <Link
+            href="/tournament"
+            className="group relative flex flex-col items-center justify-center gap-3 px-6 py-12 rounded-3xl bg-gradient-to-br from-violet-600 to-violet-800 hover:from-violet-500 hover:to-violet-700 text-white shadow-xl shadow-violet-950/40 transition-all duration-200 hover:scale-[1.02] active:scale-100 sm:col-span-2 lg:col-span-1"
+          >
+            <span className="text-6xl group-hover:scale-110 transition-transform">🏆</span>
+            <div className="text-center">
+              <p className="text-2xl font-black tracking-wide leading-none">1-Day Tournament</p>
+              <p className="text-xs font-semibold text-violet-100/90 mt-2">One-off knockout · Darts or Pool</p>
             </div>
           </Link>
         </div>

@@ -48,9 +48,12 @@ export default function PoolAdminPage() {
   return (
     <div className="min-h-screen bg-charcoal-950">
       <div className="max-w-5xl mx-auto px-4 py-8">
-        <div className="flex justify-end mb-4">
+        <div className="flex flex-wrap justify-end gap-2 mb-4">
           <a href="/admin" className="px-4 py-2 bg-amber-950/60 border border-amber-800/50 hover:bg-amber-900/60 text-amber-300 text-xs font-bold rounded-lg transition-all">
-            ← Darts Admin
+            🎯 Darts Admin
+          </a>
+          <a href="/tournament/admin" className="px-4 py-2 bg-violet-950/60 border border-violet-800/50 hover:bg-violet-900/60 text-violet-300 text-xs font-bold rounded-lg transition-all">
+            🏆 1-Day Tournament Admin
           </a>
         </div>
         <PoolAdminDashboard initialPlayers={players} initialTournaments={tournaments} />
