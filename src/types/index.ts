@@ -139,6 +139,95 @@ export interface PoolStandingsRow {
   points: number;
 }
 
+// ---------------------------------------------------------------------------
+// One-Day Tournament (separate module, own tables — see schema_day_tournament.sql)
+// A single-day event that can be run for either sport, singles or doubles,
+// as a league or a knockout. Fixtures are played between "competitors" —
+// a competitor is one player (singles) or a paired-up team of two (doubles).
+// ---------------------------------------------------------------------------
+
+export interface DayTournamentPlayer {
+  id: string;
+  name: string;
+  created_at: string;
+}
+
+export type DayTournamentSport = 'darts' | 'pool';
+export type DayTournamentEntryType = 'singles' | 'doubles';
+export type DayTournamentFormat = 'knockout' | 'league';
+export type DayTournamentPotMode = 'single' | 'multiple';
+export type DayTournamentStatus = 'setup' | 'active' | 'completed';
+
+export interface DayTournament {
+  id: string;
+  name: string;
+  event_date: string | null;
+  sport: DayTournamentSport;
+  entry_type: DayTournamentEntryType;
+  format: DayTournamentFormat;
+  legs_per_game: number;
+  pot_mode: DayTournamentPotMode;
+  games_per_competitor: number | null; // league format only
+  status: DayTournamentStatus;
+  created_at: string;
+}
+
+export interface DayTournamentPot {
+  id: string;
+  tournament_id: string;
+  name: string;
+  sequence_order: number;
+}
+
+export interface DayTournamentEntrant {
+  id: string;
+  tournament_id: string;
+  player_id: string;
+  pot_id: string | null;
+}
+
+/** The unit that actually plays fixtures — one player (singles) or a
+ * paired-up team of two (doubles, player_2_id set). */
+export interface DayTournamentCompetitor {
+  id: string;
+  tournament_id: string;
+  player_1_id: string;
+  player_2_id: string | null;
+}
+
+export interface DayTournamentRound {
+  id: string;
+  tournament_id: string;
+  name: string;
+  sequence_order: number;
+}
+
+export interface DayTournamentFixture {
+  id: string;
+  round_id: string;
+  competitor_1_id: string;
+  competitor_2_id: string | null;
+  competitor_1_score: number;
+  competitor_2_score: number;
+  completed: boolean;
+  is_bye: boolean;
+  best_of: number;
+  slot_code: string | null;
+}
+
+export interface DayTournamentStandingsRow {
+  position: number;
+  competitorId: string;
+  name: string;
+  played: number;
+  won: number;
+  lost: number;
+  legsWon: number;
+  legsLost: number;
+  legDifference: number;
+  points: number;
+}
+
 export interface PlayerStat {
   player_id: string;
   player_name: string;

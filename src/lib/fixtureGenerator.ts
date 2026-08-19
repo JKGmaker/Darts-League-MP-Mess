@@ -94,3 +94,112 @@ export function generateKnockoutPairings(playerIds: string[]): {
   }
   return { pairs, byePlayerId };
 }
+
+// ---------------------------------------------------------------------------
+// Pot-aware variants — used by the One-Day Tournament module. When entrants
+// are split into pots (e.g. to keep clubmates, or stronger/weaker players,
+// apart), the draw should avoid pairing two competitors from the same pot
+// wherever it's mathematically possible. Rather than a full constraint
+// solver, we take several random shuffles and keep whichever one produces
+// the fewest same-pot pairings — simple, fast, and good enough for the
+// handful of entrants a one-day event has.
+// ---------------------------------------------------------------------------
+
+const POT_AWARE_ATTEMPTS = 60;
+
+function countSamePotPairs(pairs: Pairing[], potOf: Map<string, string | null>): number {
+  let clashes = 0;
+  for (const [a, b] of pairs) {
+    const potA = potOf.get(a) ?? null;
+    const potB = potOf.get(b) ?? null;
+    if (potA !== null && potB !== null && potA === potB) clashes += 1;
+  }
+  return clashes;
+}
+
+/**
+ * Same as generateKnockoutPairings, but tries multiple random draws and
+ * keeps the one with the fewest same-pot first-round pairings (0 if
+ * achievable). Later knockout rounds are winners-only, so pot avoidance
+ * only ever applies to the initial draw.
+ */
+export function generatePotAwareKnockoutPairings(
+  playerIds: string[],
+  potOf: Map<string, string | null>
+): { pairs: Pairing[]; byePlayerId: string | null } {
+  let best: { pairs: Pairing[]; byePlayerId: string | null } | null = null;
+  let bestClashes = Infinity;
+  for (let i = 0; i < POT_AWARE_ATTEMPTS; i++) {
+    const attempt = generateKnockoutPairings(playerIds);
+    const clashes = countSamePotPairs(attempt.pairs, potOf);
+    if (clashes < bestClashes) {
+      best = attempt;
+      bestClashes = clashes;
+      if (clashes === 0) break;
+    }
+  }
+  return best as { pairs: Pairing[]; byePlayerId: string | null };
+}
+
+/**
+ * Same as generateRoundRobinRounds, but tries multiple starting shuffles and
+ * keeps whichever produces the fewest same-pot pairings summed across every
+ * round generated — the round-robin "no repeat opponent" guarantee still
+ * holds either way, since it's the same underlying algorithm.
+ */
+export function generatePotAwareRoundRobinRounds(
+  playerIds: string[],
+  gamesPerPlayer: number,
+  potOf: Map<string, string | null>
+): GeneratedRound[] {
+  let best: GeneratedRound[] | null = null;
+  let bestClashes = Infinity;
+  for (let i = 0; i < POT_AWARE_ATTEMPTS; i++) {
+    const attempt = generateRoundRobinRounds(playerIds, gamesPerPlayer);
+    const clashes = attempt.reduce((sum, round) => sum + countSamePotPairs(round.pairs, potOf), 0);
+    if (clashes < bestClashes) {
+      best = attempt;
+      bestClashes = clashes;
+      if (clashes === 0) break;
+    }
+  }
+  return best || [];
+}
+
+/**
+ * Auto-pairs doubles teams from a pot-tagged entrant list. With two (or
+ * more) pots, entrants are interleaved round-robin across pots before
+ * pairing up adjacent entrants, so partners come from different pots
+ * wherever possible (guaranteed when there are exactly two evenly-sized
+ * pots). With a single pot, it's just a random draw. Returns the pairs plus
+ * the id of anyone left over on an odd headcount (no partner found).
+ */
+export function pairDoublesFromPots(
+  entrants: { id: string; potId: string | null }[]
+): { pairs: Pairing[]; unpairedId: string | null } {
+  const potGroups = new Map<string, string[]>();
+  for (const e of entrants) {
+    const key = e.potId || '__none__';
+    const list = potGroups.get(key) || [];
+    list.push(e.id);
+    potGroups.set(key, list);
+  }
+  const shuffledGroups = Array.from(potGroups.values()).map((ids) => shuffle(ids));
+
+  // Interleave: pot1[0], pot2[0], pot3[0], pot1[1], pot2[1], ...
+  const interleaved: string[] = [];
+  const maxLen = Math.max(0, ...shuffledGroups.map((g) => g.length));
+  for (let i = 0; i < maxLen; i++) {
+    for (const group of shuffledGroups) {
+      if (group[i]) interleaved.push(group[i]);
+    }
+  }
+
+  const pairs: Pairing[] = [];
+  let unpairedId: string | null = null;
+  for (let i = 0; i < interleaved.length; i += 2) {
+    if (i + 1 < interleaved.length) pairs.push([interleaved[i], interleaved[i + 1]]);
+    else unpairedId = interleaved[i];
+  }
+  return { pairs, unpairedId };
+}

@@ -41,12 +41,20 @@ export default async function DartsHomePage() {
           </Link>
           <h1 className="text-5xl sm:text-7xl font-black text-white tracking-tight leading-none drop-shadow-lg">MP Mess</h1>
           <h2 className="text-4xl sm:text-6xl font-black text-amber-400 tracking-tight leading-none drop-shadow-lg">Darts</h2>
-          <Link
-            href="/pool"
-            className="inline-flex items-center gap-2 mt-5 text-sm font-bold text-sky-300 hover:text-sky-200 bg-sky-950/60 border border-sky-800/50 px-4 py-2 rounded-full transition-colors"
-          >
-            🎱 Switch to MP Mess Pool
-          </Link>
+          <div className="flex flex-wrap gap-3 mt-5">
+            <Link
+              href="/pool"
+              className="inline-flex items-center gap-2 text-sm font-bold text-sky-300 hover:text-sky-200 bg-sky-950/60 border border-sky-800/50 px-4 py-2 rounded-full transition-colors"
+            >
+              🎱 Switch to MP Mess Pool
+            </Link>
+            <Link
+              href="/tournament"
+              className="inline-flex items-center gap-2 text-sm font-bold text-emerald-300 hover:text-emerald-200 bg-emerald-950/60 border border-emerald-800/50 px-4 py-2 rounded-full transition-colors"
+            >
+              🏆 One-Day Tournaments
+            </Link>
+          </div>
         </div>
       </header>
       <main className="max-w-6xl mx-auto px-4 py-8 space-y-10">
